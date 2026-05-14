@@ -4,7 +4,16 @@ import type { LLMClient } from "../agent";
  * Thin, dependency-free LLM clients. Each one implements the provider-agnostic
  * `LLMClient` interface using `fetch`, so the core library ships no vendor SDK.
  * Use these on the server only — they require API keys.
+ *
+ * Streaming-capable variants live in `./streaming` and are re-exported below.
  */
+
+export {
+  createAnthropicStreamClient,
+  createOpenAIStreamClient,
+  type AnthropicStreamClientOptions,
+  type OpenAIStreamClientOptions,
+} from "./streaming";
 
 export interface AnthropicClientOptions {
   apiKey: string;

@@ -1,0 +1,57 @@
+import type { CapabilityModule } from "../agent";
+
+/**
+ * Styling capability: teaches the model the StyleSpec vocabulary, the
+ * motion presets, the style/motion/theme patch ops, and the low-level
+ * Box/Image/Icon/Spacer primitives.
+ */
+
+const SYSTEM_PROMPT = `You can style and animate any node, and theme the whole dashboard.
+
+### node.style — a StyleSpec (every field optional, token-based)
+Layout: display ('block'|'flex'|'grid'|'inline-flex'|'hidden'),
+direction ('row'|'col'), align ('start'|'center'|'end'|'stretch'|'baseline'),
+justify ('start'|'center'|'end'|'between'|'around'|'evenly'),
+wrap (boolean), gap (0|1|2|3|4|5|6|8|10|12|16),
+gridCols (1-12).
+Sizing: width ('auto'|'full'|'fit'|'screen'|'min'|'max'),
+height ('auto'|'full'|'fit'|'screen'), grow (boolean).
+Spacing (all 0|1|2|3|4|5|6|8|10|12|16): p, px, py, pt, pb, m, mx, my.
+Visual: bg / color / borderColor (token: 'background','foreground','card',
+'card-foreground','primary','primary-foreground','secondary',
+'secondary-foreground','muted','muted-foreground','accent',
+'accent-foreground','border','transparent'),
+borderWidth (0|1|2), rounded ('none'|'sm'|'md'|'lg'|'xl'|'2xl'|'full'),
+shadow ('none'|'sm'|'md'|'lg'|'xl'), opacity (0-100).
+Typography: fontSize ('xs'|'sm'|'base'|'lg'|'xl'|'2xl'|'3xl'|'4xl'),
+fontWeight ('normal'|'medium'|'semibold'|'bold'),
+textAlign ('left'|'center'|'right'), italic (boolean), truncate (boolean).
+Grid width: **span (1-12)** sizes the node within the parent Grid — set it
+on any node placed in a Grid.
+Responsive/state: nest a partial StyleSpec under \`sm\`, \`md\`, \`lg\` for
+breakpoints, or \`hover\`, \`focus\` for interaction states.
+Escape hatch: \`className\` (raw Tailwind) is appended last — use sparingly.
+
+### node.motion — a MotionSpec
+Set \`preset\` to one of: "fade", "rise", "pop", "slide-left", "slide-up",
+"scale-in". Override any preset value with explicit \`initial\`, \`animate\`,
+\`exit\`, \`whileHover\`, \`whileTap\`, \`transition\` (Framer Motion objects).
+
+### Patch ops
+- { "op": "setStyle", "id", "style": StyleSpec | null } — replace a node's style (null clears it).
+- { "op": "setMotion", "id", "motion": MotionSpec | null } — replace a node's motion.
+- { "op": "setTheme", "theme": Theme } — Theme is { colors?: Record<name, "H S% L%">, radius?: 'none'|'sm'|'md'|'lg'|'xl', font?: string, mode?: 'light'|'dark' }.
+
+### Low-level primitives (use when built-ins don't fit)
+- Box — generic container, no styling of its own; drive everything via \`style\`. props: as?: 'div'|'section'|'article'|'header'|'footer'|'nav'|'aside'|'main'. Accepts children.
+- Image — props: src, alt?, rounded?, aspect? ('auto'|'square'|'video'). Renders object-cover.
+- Icon — props: name ('check'|'x'|'arrow-up'|'arrow-down'|'star'|'bolt'|'dot'|'chevron-right'), size? (px).
+- Spacer — flexible spacer that absorbs free space in a flex container.
+
+Prefer styling via \`style\` tokens over raw \`className\`. Compose Box + style
+to build layouts the named components don't cover.`;
+
+export const styleCapability: CapabilityModule = {
+  name: "styling",
+  systemPrompt: SYSTEM_PROMPT,
+};

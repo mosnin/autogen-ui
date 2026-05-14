@@ -1,18 +1,20 @@
 "use client";
 
-import { DashboardRenderer, useDashboard } from "@autogen-ui/core";
+import { DashboardRenderer, useRuntime, useStreamingDashboard } from "@autogen-ui/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 const SUGGESTIONS = [
   "Build a SaaS revenue dashboard with MRR, churn and active users",
   "Add a bar chart of signups by month and a recent customers table",
-  "Make the revenue card span the full width and add a trend line",
-  "Turn this into a fitness tracker dashboard instead",
+  "Restyle it with an indigo accent, rounded cards and tighter spacing",
+  "Define a reusable MetricCard component and use it for 4 KPIs",
 ];
 
 export default function Page() {
-  const { dashboard, messages, isLoading, error, sendMessage, reset } = useDashboard();
+  const { dashboard, messages, isLoading, error, sendMessage, reset } =
+    useStreamingDashboard();
+  const { data, dispatch } = useRuntime(dashboard);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -159,7 +161,10 @@ export default function Page() {
                 animate={{ opacity: 1 }}
                 className="mx-auto max-w-6xl"
               >
-                <DashboardRenderer dashboard={dashboard} />
+                <DashboardRenderer
+                  dashboard={dashboard}
+                  context={{ data, dispatch }}
+                />
               </motion.div>
             )}
           </AnimatePresence>

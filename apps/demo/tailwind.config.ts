@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import autogenUiPreset from "@autogen-ui/core/tailwind.preset";
+import { STATIC_SAFELIST } from "@autogen-ui/core/style";
 
 const config: Config = {
   darkMode: "class",
@@ -10,6 +11,9 @@ const config: Config = {
     "../../packages/core/src/**/*.{ts,tsx}",
     "../../packages/core/dist/**/*.js",
   ],
+  // The style engine emits token-driven classes (incl. responsive/state
+  // prefixes) that the scanner can't see as literals — keep them all.
+  safelist: STATIC_SAFELIST.split(/\s+/).filter(Boolean),
   theme: {
     extend: {},
   },

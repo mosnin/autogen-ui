@@ -1,3 +1,4 @@
+import { Box, Icon, Image, Spacer } from "./components/box";
 import {
   Badge,
   Button,
@@ -115,6 +116,33 @@ export const componentCatalog: ComponentDoc[] = [
     props: "(none)",
     acceptsChildren: false,
   },
+  {
+    type: "Box",
+    description:
+      "Generic container. Carries no styling of its own — drive layout/visuals via the node's `style`. Use it to build novel layouts.",
+    props: "as?: 'div'|'section'|'article'|'header'|'footer'|'nav'|'aside'|'main'",
+    acceptsChildren: true,
+  },
+  {
+    type: "Image",
+    description: "Image rendered with object-cover.",
+    props:
+      "src: string, alt?: string, rounded?: 'none'|'sm'|'md'|'lg'|'xl'|'2xl'|'full', aspect?: 'auto'|'square'|'video'",
+    acceptsChildren: false,
+  },
+  {
+    type: "Icon",
+    description: "Inline SVG icon from a small built-in set.",
+    props:
+      "name: 'check'|'x'|'arrow-up'|'arrow-down'|'star'|'bolt'|'dot'|'chevron-right', size?: number (px, default 16)",
+    acceptsChildren: false,
+  },
+  {
+    type: "Spacer",
+    description: "Flexible spacer that absorbs free space inside a flex container.",
+    props: "(none)",
+    acceptsChildren: false,
+  },
 ];
 
 /** Built-in component registry mapping spec `type` -> React component. */
@@ -133,6 +161,10 @@ export const defaultRegistry: ComponentRegistry = {
   Progress,
   List,
   Divider,
+  Box,
+  Image,
+  Icon,
+  Spacer,
 };
 
 /** Merge custom components onto the defaults. Custom entries win on conflict. */

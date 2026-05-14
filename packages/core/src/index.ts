@@ -1,9 +1,9 @@
 /**
  * @autogen-ui/core — talk to an AI and watch your dashboard build itself.
  *
- * Server entry points (`createUIAgent`, `createRouteHandler`) and the LLM
- * clients (`@autogen-ui/core/clients`) require an API key and must run
- * server-side. Everything else is safe in the browser.
+ * Server entry points (`createUIAgent`, `createStreamingUIAgent`, the route
+ * handlers) and the LLM clients (`@autogen-ui/core/clients`) require an API
+ * key and must run server-side. Everything else is safe in the browser.
  */
 
 // Spec, patches, runtime contracts
@@ -66,9 +66,64 @@ export type {
   RegistryComponentProps,
 } from "./components/types";
 export * as primitives from "./components/primitives";
+export { Box, Icon, Image, Spacer } from "./components/box";
 
-// Renderer
+// Renderer + runtime extensions
 export { DashboardRenderer, type DashboardRendererProps } from "./renderer";
+export { defaultExtensions } from "./extensions";
+
+// Phase 1 — style engine, motion, theming
+export { compileStyle, STATIC_SAFELIST } from "./style";
+export { compileMotion } from "./motion";
+export { ThemeProvider, themeToCssVars, type ThemeProviderProps } from "./theme";
+
+// Phase 3 — runtime component definition
+export { instantiateComponent, listComponentTypes, validateComponentDef } from "./define";
+export {
+  createCodegenResolver,
+  type CodegenOptions,
+  type CodegenResolver,
+} from "./sandbox/codegen";
+
+// Phase 4 — dynamic data + declarative actions
+export {
+  fetchDataSource,
+  getPath,
+  resolveBindings,
+  selectPath,
+  useDataSources,
+  type UseDataSourcesResult,
+} from "./data";
+export { compileEvents, createDispatcher, type CreateDispatcherArgs } from "./actions";
+export {
+  useRuntime,
+  type UseRuntimeOptions,
+  type UseRuntimeResult,
+} from "./hooks/useRuntime";
+
+// Phase 2 — real-time streaming
+export { encodeFrame, framesToResponse, readFrames } from "./stream";
+export {
+  createStreamingUIAgent,
+  type CreateStreamingUIAgentOptions,
+  type StreamingUIAgent,
+} from "./streaming-agent";
+export { createStreamingRouteHandler } from "./createStreamRouteHandler";
+export {
+  useStreamingDashboard,
+  type UseStreamingDashboardOptions,
+  type UseStreamingDashboardResult,
+} from "./hooks/useStreamingDashboard";
+
+// Capabilities (system-prompt modules)
+export {
+  defaultCapabilities,
+  defineCapability,
+  dynamicCapability,
+  streamingCapabilities,
+  streamingCapability,
+  styleCapability,
+} from "./capabilities";
 
 // Agent (server)
 export {
@@ -83,12 +138,36 @@ export {
   type UIAgent,
 } from "./agent";
 
-// React hook (client)
+// React hooks (client)
 export {
   useDashboard,
   type UseDashboardOptions,
   type UseDashboardResult,
 } from "./hooks/useDashboard";
+
+// Phase 5 — history, persistence, eval
+export {
+  createHistory,
+  useHistory,
+  type DashboardHistory,
+  type UseHistoryResult,
+} from "./history";
+export {
+  deserializeDashboard,
+  exportDashboardFile,
+  loadDashboard,
+  saveDashboard,
+  serializeDashboard,
+  STORAGE_KEY,
+} from "./persistence";
+export {
+  assertValidPatches,
+  createFakeClient,
+  runEval,
+  type EvalCase,
+  type EvalResult,
+} from "./eval/harness";
+export { goldenCases } from "./eval/cases";
 
 // Utilities
 export { cn, nodeId } from "./utils";

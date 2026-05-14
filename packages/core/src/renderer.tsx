@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
 import type { ComponentRegistry } from "./components/types";
+import { defaultExtensions } from "./extensions";
 import { defaultRegistry } from "./registry";
 import { noopExtensions, type RendererExtensions, type RuntimeContext } from "./runtime";
 import type { Dashboard, UINode } from "./schema";
@@ -128,6 +129,11 @@ export interface DashboardRendererProps {
   registry?: ComponentRegistry;
   /** Pluggable runtime extensions; merged over the wired-in defaults. */
   extensions?: RendererExtensions;
+  /**
+   * Replace (rather than extend) the default extensions entirely. When
+   * omitted, `extensions` is layered over `defaultExtensions`.
+   */
+  baseExtensions?: RendererExtensions;
   /** Resolved data + dispatch from the data/action layer. */
   context?: Partial<Pick<RuntimeContext, "data" | "dispatch">>;
   className?: string;
@@ -143,12 +149,13 @@ export function DashboardRenderer({
   dashboard,
   registry = defaultRegistry,
   extensions,
+  baseExtensions = defaultExtensions,
   context,
   className,
 }: DashboardRendererProps) {
   const ext = useMemo<Required<RendererExtensions>>(
-    () => ({ ...noopExtensions, ...extensions }),
-    [extensions],
+    () => ({ ...noopExtensions, ...baseExtensions, ...extensions }),
+    [baseExtensions, extensions],
   );
 
   const ctx = useMemo<RuntimeContext>(
