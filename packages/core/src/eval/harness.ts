@@ -1,4 +1,5 @@
-import type { LLMClient, UIAgent } from "../agent";
+import type { UIAgent } from "../agent";
+import type { LLMClient, LLMRequest, LLMResult } from "../llm";
 import {
   agentResponseSchema,
   patchSchema,
@@ -8,37 +9,49 @@ import {
 } from "../schema";
 
 /**
- * A tiny eval harness for generation quality. It depends on nothing external:
- * `createFakeClient` gives the agent deterministic scripted replies, and
- * `runEval` runs a list of `EvalCase`s and reports pass/fail. Use it in unit
- * tests with a fake client, or point `runEval` at a real agent in CI.
+ * Tiny eval harness for generation quality. `createFakeClient` gives the
+ * agent deterministic scripted tool calls, and `runEval` runs a list of
+ * `EvalCase`s and reports pass/fail.
  */
 
-type FakeRequest = {
-  system: string;
-  messages: { role: string; content: string }[];
-};
+export type FakeReply =
+  | AgentResponse
+  | { toolName: string; input: unknown }
+  | { text: string };
 
-type ScriptEntry = string | ((req: FakeRequest) => string);
+type ScriptEntry = FakeReply | ((req: LLMRequest) => FakeReply);
 
 /**
- * An `LLMClient` that replays a fixed script. Each `complete` call consumes
- * the next entry: a literal string, or a function of the request. Running off
- * the end of the script throws — tests should script exactly one entry per
- * expected turn.
+ * An `LLMClient` that replays a fixed script of fake tool calls. Each
+ * `complete` call consumes the next entry. If the entry is an
+ * `AgentResponse`, it's returned as if the model called `emit_patches` with
+ * that input. Running off the end of the script throws.
  */
 export function createFakeClient(script: ScriptEntry[]): LLMClient {
   let cursor = 0;
   return {
     name: "fake",
-    async complete(req) {
+    async complete(req: LLMRequest): Promise<LLMResult> {
       if (cursor >= script.length) {
         throw new Error(
           `[autogen-ui] fake client script exhausted after ${script.length} call(s)`,
         );
       }
-      const entry = script[cursor++]!;
-      return typeof entry === "function" ? entry(req) : entry;
+      const entryRaw = script[cursor++]!;
+      const entry = typeof entryRaw === "function" ? entryRaw(req) : entryRaw;
+      if ("patches" in entry) {
+        return {
+          text: "",
+          toolCalls: [{ id: `call_${cursor}`, name: "emit_patches", input: entry }],
+        };
+      }
+      if ("toolName" in entry) {
+        return {
+          text: "",
+          toolCalls: [{ id: `call_${cursor}`, name: entry.toolName, input: entry.input }],
+        };
+      }
+      return { text: entry.text, toolCalls: [] };
     },
   };
 }
@@ -58,10 +71,7 @@ export interface EvalResult {
 }
 
 /** Run each case through the agent and apply its `expect` assertion. */
-export async function runEval(
-  agent: UIAgent,
-  cases: EvalCase[],
-): Promise<EvalResult[]> {
+export async function runEval(agent: UIAgent, cases: EvalCase[]): Promise<EvalResult[]> {
   const results: EvalResult[] = [];
   for (const c of cases) {
     try {
@@ -86,7 +96,6 @@ export async function runEval(
   return results;
 }
 
-/** Patch ops that reference an existing node/component/source id. */
 const ID_REF_OPS = new Set([
   "replace",
   "update",
@@ -118,11 +127,7 @@ export function assertValidPatches(result: AgentResponse): string | null {
     }
     if (ID_REF_OPS.has(patch.op)) {
       const ref =
-        "id" in patch
-          ? patch.id
-          : "parentId" in patch
-            ? patch.parentId
-            : undefined;
+        "id" in patch ? patch.id : "parentId" in patch ? patch.parentId : undefined;
       if (!ref || ref.trim() === "") {
         return `patch[${i}] (${patch.op}) references an empty id`;
       }

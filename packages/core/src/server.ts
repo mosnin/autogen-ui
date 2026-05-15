@@ -51,15 +51,23 @@ export { applyPatch, applyPatches, findNode } from "./patch";
 // Agent (standard + streaming) + route handlers
 export {
   buildContextMessage,
+  buildSystemSegments,
   createRouteHandler,
   createUIAgent,
-  extractJson,
+  EMIT_PATCHES_TOOL,
   getSystemPrompt,
   type CapabilityModule,
   type CreateUIAgentOptions,
   type LLMClient,
+  type LLMEvent,
+  type LLMRequest,
+  type LLMResult,
+  type LLMSystemSegment,
+  type LLMTool,
+  type ToolCall,
   type UIAgent,
 } from "./agent";
+export { systemToSegments, systemToString } from "./llm";
 export {
   createStreamingUIAgent,
   type CreateStreamingUIAgentOptions,

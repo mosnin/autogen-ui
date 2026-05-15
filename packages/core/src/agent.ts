@@ -1,3 +1,5 @@
+import type { LLMClient, LLMSystemSegment, LLMTool } from "./llm";
+import { componentCatalog, type ComponentDoc } from "./registry";
 import {
   agentRequestSchema,
   agentResponseSchema,
@@ -6,22 +8,6 @@ import {
   type AgentResponse,
   type ChatMessage,
 } from "./schema";
-import { componentCatalog } from "./registry";
-
-/**
- * Provider-agnostic chat completion client. Implement this to plug in any
- * model backend; `complete` receives a system prompt + chat transcript and
- * returns the model's raw text reply. `stream` is optional — when present,
- * the streaming agent (Phase 2) uses it to emit patches incrementally.
- */
-export interface LLMClient {
-  readonly name: string;
-  complete(req: { system: string; messages: ChatMessage[] }): Promise<string>;
-  stream?(req: {
-    system: string;
-    messages: ChatMessage[];
-  }): AsyncIterable<string>;
-}
 
 /**
  * A capability module contributes a section to the system prompt describing
@@ -43,12 +29,27 @@ export interface CreateUIAgentOptions {
   client: LLMClient;
   /** Capability modules whose prompt sections are appended, in order. */
   capabilities?: CapabilityModule[];
+  /**
+   * Extra components the consumer has registered with the renderer.
+   * Their `ComponentDoc` entries are appended to the catalog the model
+   * sees, so the agent can actually use them.
+   */
+  components?: ComponentDoc[];
   /** Extra product-specific guidance (tone, domain defaults, ...). */
   instructions?: string;
+  /**
+   * Bounded auto-repair: when the model's tool input fails Zod validation,
+   * feed the error back and retry up to this many times. Default 2.
+   */
+  maxRepairAttempts?: number;
 }
 
-function buildCatalogText(): string {
-  return componentCatalog
+/* ------------------------------------------------------------------ *
+ * System prompt
+ * ------------------------------------------------------------------ */
+
+function buildCatalogText(extra: ComponentDoc[]): string {
+  return [...componentCatalog, ...extra]
     .map(
       (c) =>
         `- ${c.type}${c.acceptsChildren ? " (container)" : ""}: ${c.description}\n    props: ${c.props}`,
@@ -56,51 +57,42 @@ function buildCatalogText(): string {
     .join("\n");
 }
 
-const PATCH_REFERENCE = `PATCH OPERATIONS (emit an ordered array):
-Structure:
-- { "op": "setRoot", "node": UINode }
-- { "op": "setTitle", "title": string }
-- { "op": "append", "parentId": string, "node": UINode, "index"?: number }
-- { "op": "update", "id": string, "props": object }     shallow-merge props
-- { "op": "replace", "id": string, "node": UINode }
-- { "op": "move", "id": string, "parentId": string, "index"?: number }
-- { "op": "remove", "id": string }
-Styling & motion:
-- { "op": "setStyle", "id": string, "style": StyleSpec | null }
-- { "op": "setMotion", "id": string, "motion": MotionSpec | null }
-- { "op": "setTheme", "theme": Theme }
-Reusable components:
-- { "op": "defineComponent", "def": ComponentDef }
-- { "op": "removeComponent", "name": string }
-Data & behaviour:
-- { "op": "setDataSource", "source": DataSource }
-- { "op": "removeDataSource", "id": string }
-- { "op": "setState", "path": string, "value": JSON }
-- { "op": "setBindings", "id": string, "bindings": Record<string,string> | null }
-- { "op": "setEvents", "id": string, "events": EventMap | null }
+const PATCH_REFERENCE = `PATCH OPERATIONS:
+Structure: setRoot{node}, setTitle{title}, append{parentId,node,index?},
+  update{id,props}, replace{id,node}, move{id,parentId,index?}, remove{id}
+Style/motion: setStyle{id,style|null}, setMotion{id,motion|null}, setTheme{theme}
+Components: defineComponent{def}, removeComponent{name}
+Data/behaviour: setDataSource{source}, removeDataSource{id},
+  setState{path,value}, setBindings{id,bindings|null}, setEvents{id,events|null}
 
-A UINode is { "id": string, "type": string, "props"?, "bindings"?, "style"?,
-"motion"?, "events"?, "children"?: UINode[] }.`;
+A UINode is { id, type, props?, bindings?, style?, motion?, events?, children? }.`;
 
-function buildSystemPrompt(capabilities: CapabilityModule[], instructions?: string): string {
-  const base = `You are the UI engine behind autogen-ui. You build and edit live
-dashboards by emitting JSON patches against a component spec tree. You never
-write code or HTML — only spec patches.
+function buildBaseSystemPrompt(
+  capabilities: CapabilityModule[],
+  extraComponents: ComponentDoc[],
+  instructions?: string,
+): string {
+  const base = `You are the UI engine behind autogen-ui. You build and edit a
+live dashboard by emitting patches against a JSON spec tree. You never write
+code or HTML — only spec patches.
 
-BUILT-IN COMPONENTS (always available as node \`type\` values):
-${buildCatalogText()}
+You will call the \`emit_patches\` tool with a single object:
+  { "message": string, "patches": Patch[] }
+"message" is a short friendly note about what you changed.
+
+COMPONENTS (only these may appear as a node \`type\`):
+${buildCatalogText(extraComponents)}
 
 ${PATCH_REFERENCE}
 
-CORE RULES:
-1. Respond with a SINGLE JSON object and nothing else:
-   { "message": string, "patches": Patch[] }
-2. Every node MUST have a unique, stable, descriptive "id". Reuse existing ids
-   when editing so nodes animate in place.
-3. Prefer the smallest set of patches. Use "setRoot" only for a brand-new
+RULES:
+1. Always call emit_patches — never reply in plain text.
+2. Every node MUST have a unique, stable, descriptive id. Reuse ids when
+   editing so the UI animates in place.
+3. Prefer the smallest set of patches. Use setRoot only for a brand-new
    dashboard or a full redesign.
-4. The root node should be a "Grid". Size children with style.span (1-12).
-5. Use realistic sample data unless the user supplied real data.
+4. The root node should be a Grid. Size children with style.span (1-12).
+5. Use realistic sample data unless the user provided real data.
 6. If the user only asks a question, answer in "message" with empty "patches".`;
 
   const capSections = capabilities
@@ -108,21 +100,24 @@ CORE RULES:
     .join("");
 
   const extra = instructions ? `\n\n## ADDITIONAL INSTRUCTIONS\n${instructions}` : "";
-
   return base + capSections + extra;
 }
 
-/** Pull a JSON object out of a reply that may be fenced or padded with prose. */
-export function extractJson(text: string): unknown {
-  let t = text.trim();
-  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence?.[1]) t = fence[1].trim();
-  if (!t.startsWith("{")) {
-    const start = t.indexOf("{");
-    const end = t.lastIndexOf("}");
-    if (start !== -1 && end !== -1 && end > start) t = t.slice(start, end + 1);
-  }
-  return JSON.parse(t);
+/**
+ * Build cache-aware system segments: the static prompt (cacheable) and the
+ * current-dashboard context (not cacheable, changes every turn).
+ */
+export function buildSystemSegments(opts: {
+  capabilities?: CapabilityModule[];
+  components?: ComponentDoc[];
+  instructions?: string;
+}): LLMSystemSegment[] {
+  const text = buildBaseSystemPrompt(
+    opts.capabilities ?? [],
+    opts.components ?? [],
+    opts.instructions,
+  );
+  return [{ text, cache: true }];
 }
 
 /** Build the per-request context message describing the current dashboard. */
@@ -134,35 +129,107 @@ export function buildContextMessage(request: AgentRequest): ChatMessage {
   };
 }
 
-/**
- * Create a UI agent. Provider-agnostic: depends only on `LLMClient`, so the
- * same agent works with Anthropic, OpenAI, a local model, or a fake in tests.
- * Pass `capabilities` to extend what the agent knows how to do.
- */
+/** The single tool the model calls every turn. Input is validated with Zod after. */
+export const EMIT_PATCHES_TOOL: LLMTool = {
+  name: "emit_patches",
+  description:
+    "Apply a list of patches to the live dashboard. Each patch is one of the documented ops " +
+    "(see the system prompt). `message` is a short note shown to the user about what you changed; " +
+    "leave `patches` empty if the user only asked a question.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      message: { type: "string" },
+      patches: { type: "array", items: { type: "object" } },
+    },
+    required: ["patches"],
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Auto-repair loop
+ * ------------------------------------------------------------------ */
+
+function describeZodError(err: { errors: { path: (string | number)[]; message: string }[] }): string {
+  return err.errors
+    .slice(0, 8)
+    .map((e) => `- ${e.path.join(".") || "(root)"}: ${e.message}`)
+    .join("\n");
+}
+
+interface RunArgs {
+  client: LLMClient;
+  system: LLMSystemSegment[];
+  initialMessages: ChatMessage[];
+  maxRepairAttempts: number;
+}
+
+async function runWithRepair({
+  client,
+  system,
+  initialMessages,
+  maxRepairAttempts,
+}: RunArgs): Promise<AgentResponse> {
+  let messages = initialMessages;
+
+  for (let attempt = 0; attempt <= maxRepairAttempts; attempt++) {
+    const result = await client.complete({
+      system,
+      messages,
+      tools: [EMIT_PATCHES_TOOL],
+      toolChoice: { name: EMIT_PATCHES_TOOL.name },
+    });
+
+    const call = result.toolCalls.find((c) => c.name === EMIT_PATCHES_TOOL.name);
+    if (!call) {
+      throw new Error(
+        `[autogen-ui] ${client.name} did not call emit_patches. text="${result.text.slice(0, 200)}"`,
+      );
+    }
+
+    const parsed = agentResponseSchema.safeParse(call.input);
+    if (parsed.success) return parsed.data;
+
+    if (attempt >= maxRepairAttempts) {
+      throw new Error(
+        `[autogen-ui] emit_patches input failed validation after ${attempt + 1} attempts:\n${describeZodError(parsed.error)}`,
+      );
+    }
+
+    messages = [
+      ...messages,
+      {
+        role: "assistant",
+        content: `(called emit_patches with: ${JSON.stringify(call.input).slice(0, 800)})`,
+      },
+      {
+        role: "user",
+        content: `Your last emit_patches call failed validation:\n${describeZodError(parsed.error)}\n\nCall emit_patches again with corrected input. Do NOT explain — just call the tool.`,
+      },
+    ];
+  }
+
+  throw new Error("[autogen-ui] unreachable");
+}
+
+/* ------------------------------------------------------------------ *
+ * Public API
+ * ------------------------------------------------------------------ */
+
 export function createUIAgent({
   client,
   capabilities = [],
+  components = [],
   instructions,
+  maxRepairAttempts = 2,
 }: CreateUIAgentOptions): UIAgent {
-  const system = buildSystemPrompt(capabilities, instructions);
+  const system = buildSystemSegments({ capabilities, components, instructions });
 
   return {
     async run(request) {
       const parsed = agentRequestSchema.parse(request);
-      const raw = await client.complete({
-        system,
-        messages: [buildContextMessage(parsed), ...parsed.messages],
-      });
-
-      let json: unknown;
-      try {
-        json = extractJson(raw);
-      } catch {
-        throw new Error(
-          `[autogen-ui] ${client.name} did not return valid JSON. Got: ${raw.slice(0, 200)}`,
-        );
-      }
-      return agentResponseSchema.parse(json);
+      const initialMessages = [buildContextMessage(parsed), ...parsed.messages];
+      return runWithRepair({ client, system, initialMessages, maxRepairAttempts });
     },
   };
 }
@@ -170,16 +237,15 @@ export function createUIAgent({
 /** Expose the assembled system prompt (useful for streaming agents and tests). */
 export function getSystemPrompt(
   capabilities: CapabilityModule[] = [],
+  components: ComponentDoc[] = [],
   instructions?: string,
 ): string {
-  return buildSystemPrompt(capabilities, instructions);
+  return buildBaseSystemPrompt(capabilities, components, instructions);
 }
 
 /**
  * Framework-agnostic POST handler (Web Request -> Web Response).
- * Works directly as a Next.js App Router route export:
- *
- *   export const POST = createRouteHandler({ agent });
+ * Works directly as a Next.js App Router route export.
  */
 export function createRouteHandler({ agent }: { agent: UIAgent }) {
   return async function POST(request: Request): Promise<Response> {
@@ -198,3 +264,6 @@ export function createRouteHandler({ agent }: { agent: UIAgent }) {
     }
   };
 }
+
+// Re-export LLM types so existing imports `from "./agent"` keep working.
+export type { LLMClient, LLMRequest, LLMResult, LLMSystemSegment, LLMTool, ToolCall, LLMEvent } from "./llm";

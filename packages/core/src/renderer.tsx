@@ -134,8 +134,8 @@ export interface DashboardRendererProps {
    * omitted, `extensions` is layered over `defaultExtensions`.
    */
   baseExtensions?: RendererExtensions;
-  /** Resolved data + dispatch from the data/action layer. */
-  context?: Partial<Pick<RuntimeContext, "data" | "dispatch">>;
+  /** Resolved data, live state, and dispatch from the data/action layer. */
+  context?: Partial<Pick<RuntimeContext, "data" | "dispatch" | "state">>;
   className?: string;
 }
 
@@ -162,10 +162,10 @@ export function DashboardRenderer({
     () => ({
       dashboard,
       data: context?.data ?? {},
-      state: dashboard.state ?? {},
+      state: context?.state ?? dashboard.state ?? {},
       dispatch: context?.dispatch ?? (() => {}),
     }),
-    [dashboard, context?.data, context?.dispatch],
+    [dashboard, context?.data, context?.state, context?.dispatch],
   );
 
   return (

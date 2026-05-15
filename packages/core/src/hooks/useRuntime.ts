@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createDispatcher } from "../actions";
 import { useDataSources } from "../data";
 import type { Action, Dashboard } from "../schema";
@@ -23,6 +23,7 @@ export interface UseRuntimeOptions {
 
 export interface UseRuntimeResult {
   data: Record<string, unknown>;
+  state: Record<string, unknown>;
   dispatch: (actions: Action[]) => void;
 }
 
@@ -56,6 +57,17 @@ export function useRuntime(
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // Sync agent-driven state patches (which land in `dashboard.state`) into
+  // the local reactive copy. Compares by reference: every `setState` patch
+  // produces a new `state` object via `patch.ts`.
+  const lastSpecStateRef = useRef(dashboard.state);
+  useEffect(() => {
+    if (dashboard.state !== lastSpecStateRef.current) {
+      lastSpecStateRef.current = dashboard.state;
+      setStateMap({ ...(dashboard.state ?? {}) });
+    }
+  }, [dashboard.state]);
+
   const setState = useCallback(
     (path: string, value: unknown) => {
       setStateMap((prev) => setPath(prev, path, value));
@@ -74,5 +86,5 @@ export function useRuntime(
     [setState, refetch],
   );
 
-  return { data, dispatch };
+  return { data, state, dispatch };
 }

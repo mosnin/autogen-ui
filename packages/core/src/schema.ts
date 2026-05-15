@@ -332,10 +332,12 @@ export const chatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
-export const agentResponseSchema = z.object({
-  message: z.string().optional(),
-  patches: z.array(patchSchema).default([]),
-});
+export const agentResponseSchema = z
+  .object({
+    message: z.string().optional(),
+    patches: z.array(patchSchema),
+  })
+  .strict();
 export type AgentResponse = z.infer<typeof agentResponseSchema>;
 
 export const agentRequestSchema = z.object({

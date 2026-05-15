@@ -14,7 +14,7 @@ const SUGGESTIONS = [
 export default function Page() {
   const { dashboard, messages, isLoading, error, sendMessage, reset } =
     useStreamingDashboard();
-  const { data, dispatch } = useRuntime(dashboard);
+  const { data, state, dispatch } = useRuntime(dashboard);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -163,7 +163,7 @@ export default function Page() {
               >
                 <DashboardRenderer
                   dashboard={dashboard}
-                  context={{ data, dispatch }}
+                  context={{ data, state, dispatch }}
                 />
               </motion.div>
             )}
