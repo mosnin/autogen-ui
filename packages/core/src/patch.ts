@@ -171,3 +171,52 @@ export function applyPatches(dashboard: Dashboard, patches: Patch[]): Dashboard 
 }
 
 export { findNode };
+
+/* ------------------------------------------------------------------ *
+ * Target validation — surface hallucinated id references
+ * ------------------------------------------------------------------ */
+
+const ID_OPS = new Set([
+  "update",
+  "replace",
+  "remove",
+  "move",
+  "setStyle",
+  "setMotion",
+  "setBindings",
+  "setEvents",
+]);
+
+function checkPatchTargets(d: Dashboard, p: Patch): string | null {
+  if (ID_OPS.has(p.op)) {
+    const id = (p as { id?: string }).id;
+    if (id && !findNode(d.root, id)) return `unknown node id "${id}"`;
+  }
+  if (p.op === "append" || p.op === "move") {
+    if (!findNode(d.root, p.parentId)) return `unknown parent id "${p.parentId}"`;
+  }
+  if (p.op === "removeComponent" && !d.components[p.name]) {
+    return `unknown component "${p.name}"`;
+  }
+  if (p.op === "removeDataSource" && !d.dataSources[p.id]) {
+    return `unknown data source "${p.id}"`;
+  }
+  return null;
+}
+
+/**
+ * Simulate-apply patches in order, returning a warning string for each one
+ * that targets an unknown id/name. Useful for surfacing the model's
+ * hallucinated references without silently dropping the patch.
+ */
+export function validatePatchTargets(dashboard: Dashboard, patches: Patch[]): string[] {
+  let current = dashboard;
+  const warnings: string[] = [];
+  for (let i = 0; i < patches.length; i++) {
+    const p = patches[i]!;
+    const w = checkPatchTargets(current, p);
+    if (w) warnings.push(`patch[${i}] (${p.op}): ${w}`);
+    current = applyPatch(current, p);
+  }
+  return warnings;
+}

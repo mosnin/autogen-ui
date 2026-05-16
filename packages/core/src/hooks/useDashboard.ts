@@ -23,6 +23,8 @@ export interface UseDashboardResult {
   messages: ChatMessage[];
   isLoading: boolean;
   error: string | null;
+  /** Patch-target warnings from the most recent turn (hallucinated ids). */
+  warnings: string[];
   /** Send a user turn; applies the returned patches to the dashboard. */
   sendMessage: (content: string) => Promise<void>;
   /** Abort an in-flight request, if any. */
@@ -52,6 +54,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -80,6 +83,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
       setMessages(nextMessages);
       setIsLoading(true);
       setError(null);
+      setWarnings([]);
 
       try {
         const res = await doFetch(endpoint, {
@@ -101,6 +105,9 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
         if (parsed.message) {
           setMessages((prev) => [...prev, { role: "assistant", content: parsed.message! }]);
         }
+        if (parsed.warnings && parsed.warnings.length > 0) {
+          setWarnings(parsed.warnings);
+        }
       } catch (err) {
         if (isAbortError(err) || controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -118,6 +125,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
     setMessages([]);
     setDashboard(initial.current);
     setError(null);
+    setWarnings([]);
   }, []);
 
   return {
@@ -125,6 +133,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
     messages,
     isLoading,
     error,
+    warnings,
     sendMessage,
     cancel,
     setDashboard,

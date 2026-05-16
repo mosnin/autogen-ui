@@ -363,6 +363,188 @@ function test(name: string, ok: boolean, detail = "") {
   test("client iterator ran fully", events[0] === "started" && events.at(-1) === "ended");
 }
 
+// ---------- 9b. Binding filters: currency, number, percent, date, upper, truncate, default
+{
+  process.stdout.write("\n# binding pipe filters\n");
+  const { resolveBindings } = await import("../src/data");
+  const ctx = {
+    dashboard: emptyDashboard(),
+    data: { sales: { total: 12345.67, ratio: 0.234 } },
+    state: { name: "alice" },
+    dispatch: () => {},
+  };
+  const apply = (expr: string): unknown => {
+    const node = {
+      id: "n",
+      type: "Text",
+      props: { text: "" },
+      bindings: { text: expr },
+    };
+    const out = resolveBindings(node, ctx);
+    return out.props?.text;
+  };
+
+  test(
+    "currency formats with USD by default",
+    typeof apply("{{sales.total | currency}}") === "string" &&
+      /[$]?12,345\.67/.test(apply("{{sales.total | currency}}") as string),
+  );
+  test(
+    "currency accepts argument",
+    /€\s?12,345\.67|12,345\.67\s?€/.test(
+      String(apply("{{sales.total | currency:EUR}}")),
+    ),
+  );
+  test("percent formats", apply("{{sales.ratio | percent}}") === "23%");
+  test("percent with digit count", apply("{{sales.ratio | percent:1}}") === "23.4%");
+  test("upper transforms", apply("{{state.name | upper}}") === "ALICE");
+  test("truncate with arg", apply("{{state.name | truncate:3}}") === "ali…");
+  test("default fills null", apply("{{state.missing | default:n/a}}") === "n/a");
+  test(
+    "embedded interpolation runs filters",
+    apply("Hi {{state.name | upper}}!") === "Hi ALICE!",
+  );
+  test(
+    "unknown filter is a silent no-op",
+    apply("{{state.name | bogus}}") === "alice",
+  );
+  test(
+    "chained filters apply left-to-right",
+    apply("{{state.name | upper | truncate:3}}") === "ALI…",
+  );
+}
+
+// ---------- 9c. Patch warnings: hallucinated id references surface.
+{
+  process.stdout.write("\n# patch warnings\n");
+  const { validatePatchTargets } = await import("../src/patch");
+  const d = emptyDashboard();
+  const withCard = applyPatches(d, [
+    {
+      op: "append",
+      parentId: "root",
+      node: { id: "card1", type: "Card", props: { title: "OK" } },
+    },
+  ]);
+
+  // Update of a known id → no warning. Update of unknown id → warning.
+  const ws = validatePatchTargets(withCard, [
+    { op: "update", id: "card1", props: { title: "Renamed" } },
+    { op: "update", id: "doesntExist", props: { title: "..." } },
+    { op: "append", parentId: "alsoNope", node: { id: "x", type: "Text" } },
+  ]);
+  test("known id produces no warning", ws.length === 2);
+  test("unknown node id surfaced", ws.some((w) => /doesntExist/.test(w)));
+  test("unknown parent id surfaced", ws.some((w) => /alsoNope/.test(w)));
+
+  // Same-turn sequencing: an append creates an id; a later update of that id
+  // should NOT warn (the simulator advances state per patch).
+  const sequential = validatePatchTargets(d, [
+    { op: "append", parentId: "root", node: { id: "fresh", type: "Stat" } },
+    { op: "update", id: "fresh", props: { label: "A" } },
+  ]);
+  test("sequential append→update sees the newly-created id", sequential.length === 0);
+
+  // Agent attaches warnings to response when present.
+  const fake = createFakeClient([
+    {
+      message: "I tried to edit something that doesn't exist.",
+      patches: [{ op: "update", id: "ghost", props: { x: 1 } }],
+    },
+  ]);
+  const agent = createUIAgent({ client: fake });
+  const result = await agent.run({
+    messages: [{ role: "user", content: "x" }],
+    dashboard: emptyDashboard(),
+  });
+  test(
+    "agent populated `warnings` for hallucinated id",
+    Array.isArray(result.warnings) && result.warnings.length === 1,
+  );
+}
+
+// ---------- 9d. Data proxy handler.
+{
+  process.stdout.write("\n# data proxy\n");
+  const { createDataProxyHandler } = await import("../src/proxy");
+  const { fetchDataSource } = await import("../src/data");
+
+  // Mock upstream — capture headers we receive.
+  let receivedHeaders: Record<string, string> = {};
+  const mockFetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    if (typeof input === "string" && input === "https://api.example.com/items") {
+      receivedHeaders = {};
+      const h = init?.headers as Record<string, string> | undefined;
+      if (h) for (const [k, v] of Object.entries(h)) receivedHeaders[k.toLowerCase()] = v;
+      return new Response(JSON.stringify({ items: [{ id: 1, label: "A" }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    throw new Error(`unmocked fetch to ${String(input)}`);
+  }) as typeof fetch;
+
+  const originalFetch = globalThis.fetch;
+  // Patch global fetch (used by the proxy handler internally).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).fetch = mockFetch;
+  try {
+    const handler = createDataProxyHandler({
+      allow: ["https://api.example.com/"],
+      headers: () => ({ authorization: "Bearer SERVER_SECRET" }),
+    });
+
+    // Reject disallowed URL.
+    const denied = await handler(
+      new Request("http://localhost/proxy", {
+        method: "POST",
+        body: JSON.stringify({ url: "https://evil.com/x" }),
+      }),
+    );
+    test("denies URLs outside allowlist", denied.status === 403);
+
+    // Successful proxy call injects auth header.
+    const ok = await handler(
+      new Request("http://localhost/proxy", {
+        method: "POST",
+        body: JSON.stringify({
+          url: "https://api.example.com/items",
+          headers: { authorization: "Bearer CLIENT_OVERRIDE" },
+        }),
+      }),
+    );
+    const wrapped = (await ok.json()) as { ok: boolean; data: { items: unknown[] } };
+    test("proxy returns wrapped response", wrapped.ok && Array.isArray(wrapped.data?.items));
+    test(
+      "server-injected header overrides client header",
+      receivedHeaders["authorization"] === "Bearer SERVER_SECRET",
+    );
+
+    // fetchDataSource with proxyUrl routes through the handler.
+    const proxyAsFetch = (async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      return handler(new Request("http://x/proxy", { method: "POST", body: init?.body as BodyInit }));
+    }) as typeof fetch;
+    const data = await fetchDataSource(
+      {
+        kind: "rest",
+        id: "items",
+        url: "https://api.example.com/items",
+        method: "GET",
+        select: "items",
+      },
+      { fetcher: proxyAsFetch, proxyUrl: "/proxy" },
+    );
+    test(
+      "fetchDataSource via proxy unwraps and selects",
+      Array.isArray(data) && (data as unknown[]).length === 1,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
 // ---------- 10. Form components are registered and discoverable.
 {
   process.stdout.write("\n# form components in registry\n");

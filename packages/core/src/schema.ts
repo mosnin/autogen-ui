@@ -336,6 +336,11 @@ export const agentResponseSchema = z
   .object({
     message: z.string().optional(),
     patches: z.array(patchSchema),
+    /**
+     * Populated by the agent (not the model) — one entry per patch that
+     * targets a node/component/dataSource id not present in the dashboard.
+     */
+    warnings: z.array(z.string()).optional(),
   })
   .strict();
 export type AgentResponse = z.infer<typeof agentResponseSchema>;

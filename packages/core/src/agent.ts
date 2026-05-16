@@ -1,4 +1,5 @@
 import type { LLMClient, LLMSystemSegment, LLMTool } from "./llm";
+import { validatePatchTargets } from "./patch";
 import { componentCatalog, type ComponentDoc } from "./registry";
 import {
   agentRequestSchema,
@@ -7,6 +8,7 @@ import {
   type AgentRequest,
   type AgentResponse,
   type ChatMessage,
+  type Dashboard,
 } from "./schema";
 
 /**
@@ -161,6 +163,7 @@ interface RunArgs {
   client: LLMClient;
   system: LLMSystemSegment[];
   initialMessages: ChatMessage[];
+  dashboard: Dashboard;
   maxRepairAttempts: number;
 }
 
@@ -168,6 +171,7 @@ async function runWithRepair({
   client,
   system,
   initialMessages,
+  dashboard,
   maxRepairAttempts,
 }: RunArgs): Promise<AgentResponse> {
   let messages = initialMessages;
@@ -188,7 +192,10 @@ async function runWithRepair({
     }
 
     const parsed = agentResponseSchema.safeParse(call.input);
-    if (parsed.success) return parsed.data;
+    if (parsed.success) {
+      const warnings = validatePatchTargets(dashboard, parsed.data.patches);
+      return warnings.length > 0 ? { ...parsed.data, warnings } : parsed.data;
+    }
 
     if (attempt >= maxRepairAttempts) {
       throw new Error(
@@ -228,8 +235,15 @@ export function createUIAgent({
   return {
     async run(request) {
       const parsed = agentRequestSchema.parse(request);
+      const dashboard = parsed.dashboard ?? emptyDashboard();
       const initialMessages = [buildContextMessage(parsed), ...parsed.messages];
-      return runWithRepair({ client, system, initialMessages, maxRepairAttempts });
+      return runWithRepair({
+        client,
+        system,
+        initialMessages,
+        dashboard,
+        maxRepairAttempts,
+      });
     },
   };
 }

@@ -46,7 +46,11 @@ export {
   type Theme,
   type UINode,
 } from "./schema";
-export { applyPatch, applyPatches, findNode } from "./patch";
+export { applyPatch, applyPatches, findNode, validatePatchTargets } from "./patch";
+
+// Data proxy for routing browser data fetches through a server-side endpoint
+// (CORS bypass + auth header injection).
+export { createDataProxyHandler, type DataProxyOptions } from "./proxy";
 
 // Agent (standard + streaming) + route handlers
 export {

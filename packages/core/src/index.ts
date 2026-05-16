@@ -45,7 +45,7 @@ export {
   type Theme,
   type UINode,
 } from "./schema";
-export { applyPatch, applyPatches, findNode } from "./patch";
+export { applyPatch, applyPatches, findNode, validatePatchTargets } from "./patch";
 export {
   noopExtensions,
   type CompiledStyle,
@@ -88,13 +88,18 @@ export {
 
 // Phase 4 — dynamic data + declarative actions
 export {
+  builtinFilters,
   fetchDataSource,
   getPath,
   resolveBindings,
   selectPath,
   useDataSources,
+  type FetchDataSourceOptions,
+  type FilterFn,
+  type UseDataSourcesOptions,
   type UseDataSourcesResult,
 } from "./data";
+export { createDataProxyHandler, type DataProxyOptions } from "./proxy";
 export {
   compileEvents,
   createDispatcher,
