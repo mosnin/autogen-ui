@@ -24,7 +24,7 @@ export interface UseRuntimeOptions {
 export interface UseRuntimeResult {
   data: Record<string, unknown>;
   state: Record<string, unknown>;
-  dispatch: (actions: Action[]) => void;
+  dispatch: (actions: Action[], eventPayload?: Record<string, unknown>) => void;
 }
 
 /** Immutably set a value at a dot-path inside an object. */

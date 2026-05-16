@@ -81,6 +81,7 @@ export {
   defaultCapabilities,
   defineCapability,
   dynamicCapability,
+  formsCapability,
   streamingCapabilities,
   streamingCapability,
   styleCapability,

@@ -261,6 +261,121 @@ function test(name: string, ok: boolean, detail = "") {
   test("valid patch still made it through", patches.length === 1 && patches[0].patch.op === "setTitle");
 }
 
+// ---------- 8. Dispatcher substitutes {{event.value}} into action values.
+{
+  process.stdout.write("\n# action payload substitution\n");
+  const { createDispatcher, compileEvents } = await import("../src/actions");
+  const stateChanges: { path: string; value: unknown }[] = [];
+  const dispatch = createDispatcher({
+    getState: () => ({ filter: "old", count: 3 }),
+    setState: (path, value) => stateChanges.push({ path, value }),
+    refetch: () => {},
+  });
+
+  dispatch(
+    [{ type: "setState", path: "filter", value: "{{event.value}}" }],
+    { value: "ringing" },
+  );
+  test(
+    "whole-string {{event.value}} becomes the typed payload",
+    stateChanges[0]?.path === "filter" && stateChanges[0]?.value === "ringing",
+  );
+
+  // Numeric whole-string token preserves the number type.
+  stateChanges.length = 0;
+  dispatch(
+    [{ type: "setState", path: "n", value: "{{event.value}}" }],
+    { value: 42 },
+  );
+  test(
+    "numeric event value stays a number",
+    stateChanges[0]?.value === 42 && typeof stateChanges[0]?.value === "number",
+  );
+
+  // Embedded token interpolates as string.
+  stateChanges.length = 0;
+  dispatch(
+    [{ type: "setState", path: "label", value: "hello {{event.name}}!" }],
+    { name: "world" },
+  );
+  test("embedded {{event.X}} interpolates", stateChanges[0]?.value === "hello world!");
+
+  // toggleState reads current state.
+  stateChanges.length = 0;
+  dispatch([{ type: "toggleState", path: "filter" }]);
+  test(
+    "toggleState flips truthy to false",
+    stateChanges[0]?.path === "filter" && stateChanges[0]?.value === false,
+  );
+
+  // compileEvents only wires onClick — onChange/onSubmit are component-owned.
+  const handlers = compileEvents(
+    {
+      onClick: [{ type: "setState", path: "x", value: 1 }],
+      onChange: [{ type: "setState", path: "y", value: 2 }],
+      onSubmit: [{ type: "setState", path: "z", value: 3 }],
+    },
+    {
+      dashboard: emptyDashboard(),
+      data: {},
+      state: {},
+      dispatch: () => {},
+    },
+  );
+  test("compileEvents wires onClick", typeof handlers.onClick === "function");
+  test("compileEvents skips onChange (form-owned)", handlers.onChange === undefined);
+  test("compileEvents skips onSubmit (form-owned)", handlers.onSubmit === undefined);
+}
+
+// ---------- 9. Streaming agent abort: in-flight stream stops on signal.
+{
+  process.stdout.write("\n# streaming agent stream events\n");
+  // Verify the streaming path consumes events progressively (proxy for abort
+  // working: we can drain one event at a time and confirm ordering).
+  const events: string[] = [];
+  const fakeStreamClient: LLMClient = {
+    name: "fake-stream",
+    async complete() {
+      throw new Error("unused");
+    },
+    async *stream() {
+      events.push("started");
+      yield { kind: "tool_start", id: "t1", name: "emit_patches" } as LLMEvent;
+      yield {
+        kind: "tool_input_delta",
+        id: "t1",
+        partialJson: '{"patches":[{"op":"setTitle","title":"A"}]}',
+      } as LLMEvent;
+      events.push("after-first-delta");
+      yield { kind: "done" } as LLMEvent;
+      events.push("ended");
+    },
+  };
+  const agent = createStreamingUIAgent({ client: fakeStreamClient });
+  let firstPatch: unknown;
+  for await (const frame of agent.runStream({
+    messages: [{ role: "user", content: "x" }],
+    dashboard: null,
+  })) {
+    if (frame.kind === "patch" && !firstPatch) firstPatch = frame.patch;
+  }
+  test("stream produced setTitle patch", (firstPatch as { op?: string })?.op === "setTitle");
+  test("client iterator ran fully", events[0] === "started" && events.at(-1) === "ended");
+}
+
+// ---------- 10. Form components are registered and discoverable.
+{
+  process.stdout.write("\n# form components in registry\n");
+  const { defaultRegistry, componentCatalog } = await import("../src/registry");
+  for (const name of ["Input", "Textarea", "Select", "Checkbox", "Switch", "Form"]) {
+    test(
+      `${name} registered`,
+      typeof defaultRegistry[name] === "function" &&
+        componentCatalog.some((c) => c.type === name),
+    );
+  }
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

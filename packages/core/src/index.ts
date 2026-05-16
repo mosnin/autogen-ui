@@ -67,9 +67,10 @@ export type {
 } from "./components/types";
 export * as primitives from "./components/primitives";
 export { Box, Icon, Image, Spacer } from "./components/box";
+export { Checkbox, Form, Input, Select, Switch, Textarea } from "./components/forms";
 
 // Renderer + runtime extensions
-export { DashboardRenderer, type DashboardRendererProps } from "./renderer";
+export { DashboardRenderer, useRuntimeContext, type DashboardRendererProps } from "./renderer";
 export { defaultExtensions } from "./extensions";
 
 // Phase 1 — style engine, motion, theming
@@ -94,7 +95,12 @@ export {
   useDataSources,
   type UseDataSourcesResult,
 } from "./data";
-export { compileEvents, createDispatcher, type CreateDispatcherArgs } from "./actions";
+export {
+  compileEvents,
+  createDispatcher,
+  type CreateDispatcherArgs,
+  type Dispatch,
+} from "./actions";
 export {
   useRuntime,
   type UseRuntimeOptions,
@@ -120,6 +126,7 @@ export {
   defaultCapabilities,
   defineCapability,
   dynamicCapability,
+  formsCapability,
   streamingCapabilities,
   streamingCapability,
   styleCapability,

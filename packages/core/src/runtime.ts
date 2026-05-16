@@ -15,7 +15,7 @@ export interface RuntimeContext {
   /** Live reactive state (filters, toggles, form values). */
   state: Record<string, unknown>;
   /** Run a declarative action list (filled by the action layer). */
-  dispatch: (actions: Action[]) => void;
+  dispatch: (actions: Action[], eventPayload?: Record<string, unknown>) => void;
 }
 
 export interface CompiledStyle {

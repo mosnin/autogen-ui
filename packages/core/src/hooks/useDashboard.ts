@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { applyPatches } from "../patch";
 import {
   agentResponseSchema,
@@ -25,16 +25,23 @@ export interface UseDashboardResult {
   error: string | null;
   /** Send a user turn; applies the returned patches to the dashboard. */
   sendMessage: (content: string) => Promise<void>;
+  /** Abort an in-flight request, if any. */
+  cancel: () => void;
   /** Replace the dashboard directly (e.g. load a saved spec). */
   setDashboard: (dashboard: Dashboard) => void;
   /** Clear chat history and reset to the initial dashboard. */
   reset: () => void;
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
 /**
- * The chat-to-UI loop, as a hook. Holds the conversation and the live
- * dashboard spec; each `sendMessage` round-trips through the agent endpoint
- * and applies the returned patches so the rendered UI edits itself.
+ * The chat-to-UI loop, as a hook. Each `sendMessage` round-trips through the
+ * agent endpoint and applies the returned patches so the UI edits itself.
+ * A new send aborts an in-flight previous send, and the hook aborts on
+ * unmount so we never apply a stale response.
  */
 export function useDashboard(options: UseDashboardOptions = {}): UseDashboardResult {
   const endpoint = options.endpoint ?? "/api/autogen-ui";
@@ -46,10 +53,27 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
   const sendMessage = useCallback(
     async (content: string) => {
       const trimmed = content.trim();
-      if (!trimmed || isLoading) return;
+      if (!trimmed) return;
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       const userMessage: ChatMessage = { role: "user", content: trimmed };
       const nextMessages = [...messages, userMessage];
@@ -62,6 +86,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ messages: nextMessages, dashboard }),
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -70,24 +95,39 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRes
         }
 
         const parsed = agentResponseSchema.parse(await res.json());
+        if (controller.signal.aborted) return;
+
         setDashboard((prev) => applyPatches(prev, parsed.patches));
         if (parsed.message) {
           setMessages((prev) => [...prev, { role: "assistant", content: parsed.message! }]);
         }
       } catch (err) {
+        if (isAbortError(err) || controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
+        if (abortRef.current === controller) abortRef.current = null;
         setIsLoading(false);
       }
     },
-    [dashboard, doFetch, endpoint, isLoading, messages],
+    [dashboard, doFetch, endpoint, messages],
   );
 
   const reset = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setMessages([]);
     setDashboard(initial.current);
     setError(null);
   }, []);
 
-  return { dashboard, messages, isLoading, error, sendMessage, setDashboard, reset };
+  return {
+    dashboard,
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    cancel,
+    setDashboard,
+    reset,
+  };
 }

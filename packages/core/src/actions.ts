@@ -1,9 +1,13 @@
 import type { RuntimeContext } from "./runtime";
-import type { Action, EventMap } from "./schema";
+import type { Action, EventMap, JsonValue } from "./schema";
 
 /**
  * Declarative, allowlisted behaviour (Phase 4). The agent never emits code —
  * only `Action` lists drawn from a fixed vocabulary, executed here.
+ *
+ * Actions may reference an event payload via `{{event.<key>}}` inside string
+ * values (e.g. `{ type: "setState", path: "filter", value: "{{event.value}}" }`
+ * wired to an Input's `onChange` substitutes the input's current value).
  */
 
 export interface CreateDispatcherArgs {
@@ -27,15 +31,68 @@ function readPath(obj: Record<string, unknown>, path: string): unknown {
   return current;
 }
 
+const EVENT_TOKEN = /\{\{\s*event\.([\w.]+)\s*\}\}/g;
+
+/**
+ * Substitute `{{event.<key>}}` tokens inside any string value in the action
+ * tree against `payload`. Numbers/booleans inside a whole-string token become
+ * their typed value; embedded tokens always interpolate as strings.
+ */
+function resolveAction(action: Action, payload?: Record<string, unknown>): Action {
+  if (!payload) return action;
+
+  const substitute = (value: JsonValue): JsonValue => {
+    if (typeof value === "string") {
+      const wholeMatch = /^\{\{\s*event\.([\w.]+)\s*\}\}$/.exec(value);
+      if (wholeMatch) {
+        const v = readPath(payload, wholeMatch[1]!);
+        return (v ?? null) as JsonValue;
+      }
+      if (EVENT_TOKEN.test(value)) {
+        EVENT_TOKEN.lastIndex = 0;
+        return value.replace(EVENT_TOKEN, (_, key) => {
+          const v = readPath(payload, String(key));
+          return v == null ? "" : String(v);
+        });
+      }
+      return value;
+    }
+    if (Array.isArray(value)) return value.map(substitute) as JsonValue;
+    if (value && typeof value === "object") {
+      const out: Record<string, JsonValue> = {};
+      for (const [k, v] of Object.entries(value)) out[k] = substitute(v as JsonValue);
+      return out;
+    }
+    return value;
+  };
+
+  switch (action.type) {
+    case "setState":
+      return { ...action, value: substitute(action.value) };
+    case "emitEvent":
+      return action.payload === undefined
+        ? action
+        : { ...action, payload: substitute(action.payload) };
+    case "openUrl":
+      return { ...action, url: String(substitute(action.url)) };
+    case "scrollTo":
+      return { ...action, nodeId: String(substitute(action.nodeId)) };
+    default:
+      return action;
+  }
+}
+
 /**
  * Build a dispatcher that executes an `Action[]`. Every action type maps to a
- * single, bounded side effect — no arbitrary code paths.
+ * single, bounded side effect — no arbitrary code paths. An optional
+ * `payload` carries event data referenceable via `{{event.<key>}}`.
  */
-export function createDispatcher(args: CreateDispatcherArgs): (actions: Action[]) => void {
+export function createDispatcher(args: CreateDispatcherArgs) {
   const { getState, setState, refetch, scrollTo, onEvent } = args;
 
-  return function dispatch(actions: Action[]): void {
-    for (const action of actions) {
+  return function dispatch(actions: Action[], payload?: Record<string, unknown>): void {
+    for (const raw of actions) {
+      const action = resolveAction(raw, payload);
       switch (action.type) {
         case "setState":
           setState(action.path, action.value);
@@ -72,41 +129,26 @@ export function createDispatcher(args: CreateDispatcherArgs): (actions: Action[]
   };
 }
 
+export type Dispatch = ReturnType<typeof createDispatcher>;
+
 /* ------------------------------------------------------------------ *
  * compileEvents
  * ------------------------------------------------------------------ */
 
 /**
- * `RendererExtensions.compileEvents` implementation. Maps spec event names to
- * DOM handler props that dispatch the bound action list. `onLoad` is fired by
- * an effect elsewhere, so it is ignored here.
+ * `RendererExtensions.compileEvents` implementation. Only `onClick` is wired
+ * to the wrapper; `onChange`/`onSubmit` are semantically owned by the inner
+ * form element and consumed by form components directly (via
+ * `useRuntimeContext` + `node.events`).
  */
 export function compileEvents(
   events: EventMap,
   ctx: RuntimeContext,
 ): Record<string, unknown> {
   const handlers: Record<string, unknown> = {};
-
   const onClick = events.onClick;
   if (onClick && onClick.length > 0) {
     handlers.onClick = () => ctx.dispatch(onClick);
   }
-
-  const onChange = events.onChange;
-  if (onChange && onChange.length > 0) {
-    handlers.onChange = (event: { target?: { value?: unknown } }) => {
-      ctx.dispatch(onChange);
-      void event;
-    };
-  }
-
-  const onSubmit = events.onSubmit;
-  if (onSubmit && onSubmit.length > 0) {
-    handlers.onSubmit = (event: { preventDefault?: () => void }) => {
-      event.preventDefault?.();
-      ctx.dispatch(onSubmit);
-    };
-  }
-
   return handlers;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { applyPatch } from "../patch";
 import { readFrames } from "../stream";
 import { emptyDashboard, type ChatMessage, type Dashboard } from "../schema";
@@ -21,17 +21,24 @@ export interface UseStreamingDashboardResult {
   error: string | null;
   /** Send a user turn; applies streamed patches to the dashboard as they arrive. */
   sendMessage: (content: string) => Promise<void>;
+  /** Abort an in-flight stream, if any. */
+  cancel: () => void;
   /** Replace the dashboard directly (e.g. load a saved spec). */
   setDashboard: (dashboard: Dashboard) => void;
   /** Clear chat history and reset to the initial dashboard. */
   reset: () => void;
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
 /**
  * Streaming variant of `useDashboard`. Each `sendMessage` POSTs to the
  * streaming endpoint and consumes NDJSON frames: every `patch` frame is
  * applied immediately so the dashboard assembles itself live, and `message`
- * deltas accumulate into the assistant reply as they stream in.
+ * deltas accumulate into the assistant reply as they stream in. A new send
+ * aborts an in-flight stream, and the hook aborts on unmount.
  */
 export function useStreamingDashboard(
   options: UseStreamingDashboardOptions = {},
@@ -45,10 +52,27 @@ export function useStreamingDashboard(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
   const sendMessage = useCallback(
     async (content: string) => {
       const trimmed = content.trim();
-      if (!trimmed || isLoading) return;
+      if (!trimmed) return;
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       const userMessage: ChatMessage = { role: "user", content: trimmed };
       const nextMessages = [...messages, userMessage];
@@ -61,6 +85,7 @@ export function useStreamingDashboard(
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ messages: nextMessages, dashboard }),
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -73,16 +98,14 @@ export function useStreamingDashboard(
         let streamError: string | null = null;
 
         for await (const frame of readFrames(res)) {
+          if (controller.signal.aborted) return;
           if (frame.kind === "patch") {
             setDashboard((prev) => applyPatch(prev, frame.patch));
           } else if (frame.kind === "message") {
             assistantContent += frame.delta;
             if (!assistantAdded) {
               assistantAdded = true;
-              setMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: assistantContent },
-              ]);
+              setMessages((prev) => [...prev, { role: "assistant", content: assistantContent }]);
             } else {
               setMessages((prev) => {
                 const next = [...prev];
@@ -96,24 +119,36 @@ export function useStreamingDashboard(
           } else if (frame.kind === "error") {
             streamError = frame.error;
           }
-          // "done" — nothing to do; the loop ends naturally.
         }
 
         if (streamError) throw new Error(streamError);
       } catch (err) {
+        if (isAbortError(err) || controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
+        if (abortRef.current === controller) abortRef.current = null;
         setIsLoading(false);
       }
     },
-    [dashboard, doFetch, endpoint, isLoading, messages],
+    [dashboard, doFetch, endpoint, messages],
   );
 
   const reset = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setMessages([]);
     setDashboard(initial.current);
     setError(null);
   }, []);
 
-  return { dashboard, messages, isLoading, error, sendMessage, setDashboard, reset };
+  return {
+    dashboard,
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    cancel,
+    setDashboard,
+    reset,
+  };
 }

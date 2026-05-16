@@ -1,4 +1,5 @@
 import { Box, Icon, Image, Spacer } from "./components/box";
+import { Checkbox, Form, Input, Select, Switch, Textarea } from "./components/forms";
 import {
   Badge,
   Button,
@@ -143,6 +144,44 @@ export const componentCatalog: ComponentDoc[] = [
     props: "(none)",
     acceptsChildren: false,
   },
+  {
+    type: "Input",
+    description:
+      "Text input. Wire `events.onChange` with a setState action that reads `{{event.value}}` to drive state. Bind `value` to that same state for a controlled input.",
+    props: "type?: 'text'|'number'|'email'|'password'|'search'|'url'|'tel', placeholder?: string, value?: string|number",
+    acceptsChildren: false,
+  },
+  {
+    type: "Textarea",
+    description: "Multi-line text input. Same event/value model as Input.",
+    props: "placeholder?: string, value?: string, rows?: number",
+    acceptsChildren: false,
+  },
+  {
+    type: "Select",
+    description: "Dropdown select. `onChange` fires with `{{event.value}}` set to the chosen option's value.",
+    props: "options: ({value:string|number,label?:string}|string|number)[], value?: string|number, placeholder?: string",
+    acceptsChildren: false,
+  },
+  {
+    type: "Checkbox",
+    description: "Boolean checkbox. `onChange` fires with `{{event.value}}` = the next boolean state.",
+    props: "label?: string, checked?: boolean",
+    acceptsChildren: false,
+  },
+  {
+    type: "Switch",
+    description: "Toggle switch (same model as Checkbox, different look).",
+    props: "label?: string, checked?: boolean",
+    acceptsChildren: false,
+  },
+  {
+    type: "Form",
+    description:
+      "Form container. `onSubmit` fires with `{{event.values}}` = a record of named field values from inner inputs that carry a DOM `name`.",
+    props: "(none)",
+    acceptsChildren: true,
+  },
 ];
 
 /** Built-in component registry mapping spec `type` -> React component. */
@@ -165,6 +204,12 @@ export const defaultRegistry: ComponentRegistry = {
   Image,
   Icon,
   Spacer,
+  Input,
+  Textarea,
+  Select,
+  Checkbox,
+  Switch,
+  Form,
 };
 
 /** Merge custom components onto the defaults. Custom entries win on conflict. */

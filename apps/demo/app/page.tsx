@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 const SUGGESTIONS = [
   "Build a SaaS revenue dashboard with MRR, churn and active users",
-  "Add a bar chart of signups by month and a recent customers table",
+  "Add a search Input bound to state.q and an echo Text showing what's typed",
   "Restyle it with an indigo accent, rounded cards and tighter spacing",
   "Define a reusable MetricCard component and use it for 4 KPIs",
 ];

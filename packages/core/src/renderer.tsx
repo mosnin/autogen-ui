@@ -6,8 +6,11 @@ import type { ComponentRegistry } from "./components/types";
 import { defaultExtensions } from "./extensions";
 import { defaultRegistry } from "./registry";
 import { noopExtensions, type RendererExtensions, type RuntimeContext } from "./runtime";
+import { RuntimeReactContext, useRuntimeContext } from "./runtime-context";
 import type { Dashboard, UINode } from "./schema";
 import { cn } from "./utils";
+
+export { useRuntimeContext };
 
 /* Static, literal class strings so Tailwind's scanner can see them. */
 const SPAN_MAP: Record<number, string> = {
@@ -37,6 +40,12 @@ const DEFAULT_SPAN: Record<string, number> = {
   Grid: 12,
   Stack: 12,
   Box: 12,
+  Input: 6,
+  Textarea: 12,
+  Select: 6,
+  Checkbox: 6,
+  Switch: 6,
+  Form: 12,
 };
 
 /** The grid-span wrapper class is structural and owned by the renderer. */
@@ -169,13 +178,15 @@ export function DashboardRenderer({
   );
 
   return (
-    <div className={cn("w-full", className)}>
-      {dashboard.title && (
-        <motion.h1 layout className="mb-6 text-2xl font-bold tracking-tight text-foreground">
-          {dashboard.title}
-        </motion.h1>
-      )}
-      <RenderNode node={dashboard.root} registry={registry} ext={ext} ctx={ctx} isRoot />
-    </div>
+    <RuntimeReactContext.Provider value={ctx}>
+      <div className={cn("w-full", className)}>
+        {dashboard.title && (
+          <motion.h1 layout className="mb-6 text-2xl font-bold tracking-tight text-foreground">
+            {dashboard.title}
+          </motion.h1>
+        )}
+        <RenderNode node={dashboard.root} registry={registry} ext={ext} ctx={ctx} isRoot />
+      </div>
+    </RuntimeReactContext.Provider>
   );
 }
