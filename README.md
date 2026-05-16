@@ -202,6 +202,45 @@ server-side.
 Built-in filters: `currency`, `number`, `percent`, `date`, `time`, `upper`,
 `lower`, `truncate`, `default`, `json`. Unknown filters are a no-op.
 
+## Use it without Next.js — plain Node http
+
+The handlers are framework-agnostic `Request`/`Response` functions. A
+one-liner adapter brings them to Node's built-in http server (or anywhere
+else):
+
+```ts
+import { createServer } from "node:http";
+import {
+  createRouteHandler,
+  createUIAgent,
+  defaultCapabilities,
+} from "@autogen-ui/core/server";
+import { toNodeHandler } from "@autogen-ui/core/node";
+import { createAnthropicClient } from "@autogen-ui/core/clients";
+
+const agent = createUIAgent({
+  client: createAnthropicClient({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+  capabilities: defaultCapabilities,
+});
+const handler = toNodeHandler(createRouteHandler({ agent }));
+
+createServer((req, res) => {
+  if (req.method === "POST" && req.url === "/api/autogen-ui") return handler(req, res);
+  res.statusCode = 404;
+  res.end();
+}).listen(3000);
+```
+
+A runnable version of this (with a fake client so it works without an API
+key) ships in the repo:
+
+```
+pnpm --filter @autogen-ui/core example:node
+curl -sX POST localhost:3000/api/autogen-ui \
+  -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"hi"}]}'
+```
+
 ## The controlled-input loop (forms)
 
 Wire `bindings.value` and `events.onChange` to the same `state.` path. The
@@ -230,17 +269,29 @@ substitution `{{event.value}}` pulls the live input value into the action.
 5. **Streaming agent** — incrementally parses `tool_input_delta` events to
    emit `patch` frames as soon as each one closes.
 
-## Test it without an API key
+## Test it
+
+Without an API key — full coverage against a fake client:
 
 ```bash
 pnpm --filter @autogen-ui/core test
 ```
 
-Runs 52 end-to-end tests against fake LLM clients: tool-use happy path,
-auto-repair, repair exhaustion, custom-component prompt injection, true
-streaming with incremental parsing, invalid-patch rejection, event-payload
-substitution, binding pipe filters, patch-target warnings, data proxy
-allowlist + header precedence, and registry presence of every component.
+Runs 52 end-to-end tests: tool-use happy path, auto-repair, repair
+exhaustion, custom-component prompt injection, true streaming with
+incremental parsing, invalid-patch rejection, event-payload substitution,
+binding pipe filters, patch-target warnings, data proxy allowlist + header
+precedence, and registry presence of every component.
+
+With an API key — real-LLM smoke (build → edit → question turns):
+
+```bash
+ANTHROPIC_API_KEY=sk-... pnpm --filter @autogen-ui/core smoke:llm
+# or
+OPENAI_API_KEY=sk-... pnpm --filter @autogen-ui/core smoke:llm
+```
+
+Exits 2 (skip) when no key is set, so CI can treat it as conditional.
 
 ## Status
 

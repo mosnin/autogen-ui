@@ -1,10 +1,33 @@
 {
   "name": "@autogen-ui/core",
-  "version": "0.1.0",
-  "description": "Talk to an AI and watch your dashboard build itself. JSON-spec UI runtime on Tailwind + shadcn + Framer Motion.",
+  "version": "0.2.0",
+  "description": "Talk to an AI and watch your dashboard build itself. JSON-spec UI runtime on Tailwind + shadcn + Framer Motion with tool-use agent, streaming, dynamic data and forms.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "keywords": [
+    "ai",
+    "agent",
+    "dashboard",
+    "generative-ui",
+    "anthropic",
+    "claude",
+    "openai",
+    "tailwind",
+    "shadcn",
+    "framer-motion",
+    "nextjs",
+    "react"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mosnin/autogen-ui.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/mosnin/autogen-ui/issues"
+  },
+  "homepage": "https://github.com/mosnin/autogen-ui#readme",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,6 +39,10 @@
     "./server": {
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
     },
     "./clients": {
       "types": "./dist/clients/index.d.ts",
@@ -32,11 +59,22 @@
       "default": "./tailwind.preset.cjs"
     }
   },
-  "files": ["dist", "src/styles.css", "tailwind.preset.cjs", "tailwind.preset.d.ts"],
+  "files": [
+    "dist",
+    "src/styles.css",
+    "tailwind.preset.cjs",
+    "tailwind.preset.d.ts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx scripts/run-eval.ts"
+    "test": "tsx scripts/run-eval.ts",
+    "smoke:llm": "tsx scripts/real-llm-smoke.ts",
+    "example:node": "tsx scripts/node-server-example.ts",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "peerDependencies": {
     "framer-motion": ">=11",
@@ -49,11 +87,15 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "framer-motion": "^11.11.17",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.6.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

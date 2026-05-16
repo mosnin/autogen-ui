@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
+import { NodeErrorBoundary } from "./components/error-boundary";
 import type { ComponentRegistry } from "./components/types";
 import { defaultExtensions } from "./extensions";
 import { defaultRegistry } from "./registry";
@@ -11,6 +12,7 @@ import type { Dashboard, UINode } from "./schema";
 import { cn } from "./utils";
 
 export { useRuntimeContext };
+export { NodeErrorBoundary } from "./components/error-boundary";
 
 /* Static, literal class strings so Tailwind's scanner can see them. */
 const SPAN_MAP: Record<number, string> = {
@@ -100,13 +102,14 @@ function RenderNode({ node: rawNode, registry, ext, ctx, isRoot }: RenderNodePro
       </AnimatePresence>
     ) : undefined;
 
-  const content = Comp ? (
+  const inner = Comp ? (
     <Comp node={node} {...(node.props ?? {})}>
       {renderedChildren}
     </Comp>
   ) : (
     <UnknownNode type={node.type} />
   );
+  const content = <NodeErrorBoundary nodeId={node.id}>{inner}</NodeErrorBoundary>;
 
   if (isRoot) return content;
 

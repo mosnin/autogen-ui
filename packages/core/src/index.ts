@@ -70,7 +70,12 @@ export { Box, Icon, Image, Spacer } from "./components/box";
 export { Checkbox, Form, Input, Select, Switch, Textarea } from "./components/forms";
 
 // Renderer + runtime extensions
-export { DashboardRenderer, useRuntimeContext, type DashboardRendererProps } from "./renderer";
+export {
+  DashboardRenderer,
+  NodeErrorBoundary,
+  useRuntimeContext,
+  type DashboardRendererProps,
+} from "./renderer";
 export { defaultExtensions } from "./extensions";
 
 // Phase 1 — style engine, motion, theming
