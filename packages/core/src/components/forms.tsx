@@ -34,14 +34,18 @@ function inputCls(extra?: string): string {
 
 const INPUT_TYPES = ["text", "number", "email", "password", "search", "url", "tel"] as const;
 
-export const Input: RegistryComponent = ({ node, type, placeholder, value }) => {
+export const Input: RegistryComponent = ({ node, type, placeholder, value, id, name }) => {
   const { dispatch } = useRuntimeContext();
   const t = oneOf(type, INPUT_TYPES, "text");
   const onChange = getActions(node?.events, "onChange");
+  const idStr = str(id);
+  const nameStr = str(name);
 
   return (
     <input
       type={t}
+      {...(idStr ? { id: idStr } : {})}
+      {...(nameStr ? { name: nameStr } : {})}
       placeholder={str(placeholder)}
       value={value === null || value === undefined ? "" : String(value)}
       onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -57,12 +61,16 @@ export const Input: RegistryComponent = ({ node, type, placeholder, value }) => 
  * Textarea
  * ------------------------------------------------------------------ */
 
-export const Textarea: RegistryComponent = ({ node, placeholder, value, rows }) => {
+export const Textarea: RegistryComponent = ({ node, placeholder, value, rows, id, name }) => {
   const { dispatch } = useRuntimeContext();
   const onChange = getActions(node?.events, "onChange");
+  const idStr = str(id);
+  const nameStr = str(name);
   return (
     <textarea
       rows={num(rows, 3)}
+      {...(idStr ? { id: idStr } : {})}
+      {...(nameStr ? { name: nameStr } : {})}
       placeholder={str(placeholder)}
       value={value === null || value === undefined ? "" : String(value)}
       onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -98,12 +106,16 @@ function toOptions(raw: unknown): SelectOption[] {
     .filter((o): o is SelectOption => o !== null);
 }
 
-export const Select: RegistryComponent = ({ node, options, value, placeholder }) => {
+export const Select: RegistryComponent = ({ node, options, value, placeholder, id, name }) => {
   const { dispatch } = useRuntimeContext();
   const onChange = getActions(node?.events, "onChange");
   const opts = toOptions(options);
+  const idStr = str(id);
+  const nameStr = str(name);
   return (
     <select
+      {...(idStr ? { id: idStr } : {})}
+      {...(nameStr ? { name: nameStr } : {})}
       value={value === null || value === undefined ? "" : String(value)}
       onChange={(e: ChangeEvent<HTMLSelectElement>) => {
         if (onChange.length > 0) dispatch(onChange, { value: e.target.value });
@@ -155,6 +167,12 @@ function CheckLike({
           aria-checked={isOn}
           tabIndex={0}
           onClick={() => fire(!isOn)}
+          onKeyDown={(e) => {
+            if (e.key === " " || e.key === "Enter") {
+              e.preventDefault();
+              fire(!isOn);
+            }
+          }}
           className={cn(
             "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
             isOn ? "bg-primary" : "bg-muted",

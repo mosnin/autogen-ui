@@ -68,6 +68,9 @@ export type {
 export * as primitives from "./components/primitives";
 export { Box, Icon, Image, Spacer } from "./components/box";
 export { Checkbox, Form, Input, Select, Switch, Textarea } from "./components/forms";
+export { Avatar, CodeBlock, Kbd, Quote, Skeleton } from "./components/media";
+export { Accordion, Breadcrumb, Link, Tabs } from "./components/navigation";
+export { Modal, Tooltip } from "./components/overlays";
 
 // Renderer + runtime extensions
 export {

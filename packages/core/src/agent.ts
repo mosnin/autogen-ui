@@ -44,6 +44,14 @@ export interface CreateUIAgentOptions {
    * feed the error back and retry up to this many times. Default 2.
    */
   maxRepairAttempts?: number;
+  /**
+   * When true, treat patch-target warnings (hallucinated id references) the
+   * same as a Zod failure: feed them back to the model and retry, up to
+   * `maxRepairAttempts`. If the final attempt still produces warnings, they
+   * are returned on the response (no throw). Default false — backwards
+   * compatible.
+   */
+  repairOnWarnings?: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -165,6 +173,7 @@ interface RunArgs {
   initialMessages: ChatMessage[];
   dashboard: Dashboard;
   maxRepairAttempts: number;
+  repairOnWarnings: boolean;
 }
 
 async function runWithRepair({
@@ -173,6 +182,7 @@ async function runWithRepair({
   initialMessages,
   dashboard,
   maxRepairAttempts,
+  repairOnWarnings,
 }: RunArgs): Promise<AgentResponse> {
   let messages = initialMessages;
 
@@ -194,7 +204,22 @@ async function runWithRepair({
     const parsed = agentResponseSchema.safeParse(call.input);
     if (parsed.success) {
       const warnings = validatePatchTargets(dashboard, parsed.data.patches);
-      return warnings.length > 0 ? { ...parsed.data, warnings } : parsed.data;
+      if (warnings.length === 0) return parsed.data;
+      if (!repairOnWarnings || attempt >= maxRepairAttempts) {
+        return { ...parsed.data, warnings };
+      }
+      messages = [
+        ...messages,
+        {
+          role: "assistant",
+          content: `(called emit_patches with: ${JSON.stringify(call.input).slice(0, 800)})`,
+        },
+        {
+          role: "user",
+          content: `Your last emit_patches call targeted ids that do not exist in the dashboard:\n${warnings.map((w) => `- ${w}`).join("\n")}\n\nRe-call emit_patches using only ids that exist in the dashboard you were given. Do NOT explain — just call the tool.`,
+        },
+      ];
+      continue;
     }
 
     if (attempt >= maxRepairAttempts) {
@@ -229,6 +254,7 @@ export function createUIAgent({
   components = [],
   instructions,
   maxRepairAttempts = 2,
+  repairOnWarnings = false,
 }: CreateUIAgentOptions): UIAgent {
   const system = buildSystemSegments({ capabilities, components, instructions });
 
@@ -243,6 +269,7 @@ export function createUIAgent({
         initialMessages,
         dashboard,
         maxRepairAttempts,
+        repairOnWarnings,
       });
     },
   };

@@ -241,6 +241,16 @@ curl -sX POST localhost:3000/api/autogen-ui \
   -d '{"messages":[{"role":"user","content":"hi"}]}'
 ```
 
+There's also a **Vite + React example** in `examples/vite-react/` that
+mounts the same agent inside Vite's dev middleware (`configureServer` hook)
+— proof the library runs anywhere with a Web Request/Response handler, not
+just Next.js:
+
+```
+pnpm --filter @autogen-ui/core build
+pnpm --filter vite-react-example dev
+```
+
 ## The controlled-input loop (forms)
 
 Wire `bindings.value` and `events.onChange` to the same `state.` path. The

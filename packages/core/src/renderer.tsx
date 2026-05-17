@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
+import { useShallowMemo } from "./_shallow";
 import { NodeErrorBoundary } from "./components/error-boundary";
 import type { ComponentRegistry } from "./components/types";
 import { defaultExtensions } from "./extensions";
@@ -48,6 +49,17 @@ const DEFAULT_SPAN: Record<string, number> = {
   Checkbox: 6,
   Switch: 6,
   Form: 12,
+  Tabs: 12,
+  Accordion: 12,
+  Link: 4,
+  Breadcrumb: 12,
+  Modal: 12,
+  Tooltip: 3,
+  Avatar: 2,
+  Skeleton: 6,
+  CodeBlock: 12,
+  Quote: 12,
+  Kbd: 2,
 };
 
 /** The grid-span wrapper class is structural and owned by the renderer. */
@@ -165,19 +177,27 @@ export function DashboardRenderer({
   context,
   className,
 }: DashboardRendererProps) {
+  // Stabilise inline-literal props (`extensions={{}}`, `context={{...}}`) by
+  // collapsing shallow-equal values to a single reference. Without this, an
+  // inline-literal from the parent busts the `useMemo`s below every render
+  // and forces a new merged `ext`/`ctx` object on every pass.
+  const stableBase = useShallowMemo(baseExtensions);
+  const stableExt = useShallowMemo(extensions);
+  const stableCtxIn = useShallowMemo(context);
+
   const ext = useMemo<Required<RendererExtensions>>(
-    () => ({ ...noopExtensions, ...baseExtensions, ...extensions }),
-    [baseExtensions, extensions],
+    () => ({ ...noopExtensions, ...stableBase, ...stableExt }),
+    [stableBase, stableExt],
   );
 
   const ctx = useMemo<RuntimeContext>(
     () => ({
       dashboard,
-      data: context?.data ?? {},
-      state: context?.state ?? dashboard.state ?? {},
-      dispatch: context?.dispatch ?? (() => {}),
+      data: stableCtxIn?.data ?? {},
+      state: stableCtxIn?.state ?? dashboard.state ?? {},
+      dispatch: stableCtxIn?.dispatch ?? (() => {}),
     }),
-    [dashboard, context?.data, context?.state, context?.dispatch],
+    [dashboard, stableCtxIn],
   );
 
   return (

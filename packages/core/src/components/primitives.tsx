@@ -3,8 +3,16 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { cn } from "../utils";
-import { arr, num, oneOf, str } from "./helpers";
+import { arr, bool, num, oneOf, str } from "./helpers";
 import type { RegistryComponent } from "./types";
+
+/** Slugify a string for use as an `id` (lowercase, non-alphanum -> dash). */
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 /* ------------------------------------------------------------------ *
  * Layout
@@ -92,11 +100,17 @@ export const Card: RegistryComponent = ({ children, title, description }) => (
 /** A KPI / metric tile: label, big value, optional delta. */
 export const Stat: RegistryComponent = ({ label, value, delta, trend }) => {
   const t = oneOf(trend, ["up", "down", "flat"] as const, "flat");
+  const labelText = str(label, "Metric");
+  const valueText = typeof value === "number" ? value.toLocaleString() : str(value, "—");
   return (
     <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-1 h-full">
-      <span className="text-sm text-muted-foreground">{str(label, "Metric")}</span>
-      <span className="text-2xl font-semibold tracking-tight">
-        {typeof value === "number" ? value.toLocaleString() : str(value, "—")}
+      <span className="text-sm text-muted-foreground">{labelText}</span>
+      <span
+        role="text"
+        aria-label={`${labelText}: ${valueText}`}
+        className="text-2xl font-semibold tracking-tight"
+      >
+        {valueText}
       </span>
       {str(delta) && (
         <span
@@ -123,9 +137,11 @@ export const Heading: RegistryComponent = ({ text, level }) => {
     "3": "text-base font-semibold",
   }[lvl];
   const content = str(text);
-  if (lvl === "1") return <h1 className={cls}>{content}</h1>;
-  if (lvl === "3") return <h3 className={cls}>{content}</h3>;
-  return <h2 className={cls}>{content}</h2>;
+  const slug = content ? slugify(content) : "";
+  const id = slug || undefined;
+  if (lvl === "1") return <h1 id={id} className={cls}>{content}</h1>;
+  if (lvl === "3") return <h3 id={id} className={cls}>{content}</h3>;
+  return <h2 id={id} className={cls}>{content}</h2>;
 };
 
 export const Text: RegistryComponent = ({ text, muted }) => (
@@ -162,32 +178,49 @@ const BUTTON_VARIANT: Record<string, string> = {
 };
 
 /** Presentational button — surfaces intent, does not wire side effects. */
-export const Button: RegistryComponent = ({ label, variant }) => (
-  <button
-    type="button"
-    className={cn(
-      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-      "transition-colors w-fit",
-      BUTTON_VARIANT[str(variant, "default")] ?? BUTTON_VARIANT.default,
-    )}
-  >
-    {str(label, "Button")}
-  </button>
-);
+export const Button: RegistryComponent = ({ label, variant, disabled, ariaLabel }) => {
+  const isDisabled = bool(disabled, false);
+  const labelText = str(label);
+  const aria = str(ariaLabel) || (labelText ? undefined : "Button");
+  return (
+    <button
+      type="button"
+      disabled={isDisabled || undefined}
+      aria-disabled={isDisabled || undefined}
+      {...(aria ? { "aria-label": aria } : {})}
+      className={cn(
+        "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
+        "transition-colors w-fit",
+        BUTTON_VARIANT[str(variant, "default")] ?? BUTTON_VARIANT.default,
+        isDisabled && "opacity-50 cursor-not-allowed pointer-events-none",
+      )}
+    >
+      {labelText || "Button"}
+    </button>
+  );
+};
 
 export const Divider: RegistryComponent = () => <hr className="border-border" />;
 
 export const Progress: RegistryComponent = ({ label, value }) => {
   const pct = Math.max(0, Math.min(100, num(value, 0)));
+  const labelText = str(label);
   return (
     <div className="space-y-1">
-      {str(label) && (
+      {labelText && (
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">{str(label)}</span>
+          <span className="text-muted-foreground">{labelText}</span>
           <span className="font-medium">{pct}%</span>
         </div>
       )}
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        {...(labelText ? { "aria-label": labelText } : {})}
+        className="h-2 w-full rounded-full bg-muted overflow-hidden"
+      >
         <motion.div
           className="h-full rounded-full bg-primary"
           initial={{ width: 0 }}
@@ -215,16 +248,29 @@ export const List: RegistryComponent = ({ items, ordered }) => {
 };
 
 /** Simple data table. `columns: string[]`, `rows: (string|number)[][]`. */
-export const Table: RegistryComponent = ({ columns, rows }) => {
+export const Table: RegistryComponent = ({ columns, rows, caption }) => {
   const cols = arr<string>(columns).map((c) => String(c));
   const data = arr<unknown[]>(rows);
+  const captionText = str(caption);
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-sm">
+      <table
+        className="w-full text-sm"
+        {...(captionText ? { "aria-label": captionText } : {})}
+      >
+        {captionText && (
+          <caption className="px-3 py-2 text-left text-sm text-muted-foreground caption-top">
+            {captionText}
+          </caption>
+        )}
         <thead className="bg-muted/50">
           <tr>
             {cols.map((c, i) => (
-              <th key={i} className="px-3 py-2 text-left font-medium text-muted-foreground">
+              <th
+                key={i}
+                scope="col"
+                className="px-3 py-2 text-left font-medium text-muted-foreground"
+              >
                 {c}
               </th>
             ))}
@@ -269,20 +315,31 @@ function toPoints(data: unknown): Point[] {
 export const Chart: RegistryComponent = ({ kind, data, title }) => {
   const k = oneOf(kind, ["bar", "line", "area"] as const, "bar");
   const points = toPoints(data);
+  const titleText = str(title);
+  const baseLabel = titleText || `${k} chart`;
+  const ariaLabel = `${baseLabel}, ${points.length} data ${points.length === 1 ? "point" : "points"}`;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-3 h-full">
-      {str(title) && <h3 className="font-semibold leading-none tracking-tight">{str(title)}</h3>}
+      {titleText && <h3 className="font-semibold leading-none tracking-tight">{titleText}</h3>}
       {points.length === 0 ? (
         <p className="text-sm text-muted-foreground">No data</p>
       ) : (
-        <ChartBody kind={k} points={points} />
+        <ChartBody kind={k} points={points} ariaLabel={ariaLabel} />
       )}
     </div>
   );
 };
 
-function ChartBody({ kind, points }: { kind: "bar" | "line" | "area"; points: Point[] }): ReactNode {
+function ChartBody({
+  kind,
+  points,
+  ariaLabel,
+}: {
+  kind: "bar" | "line" | "area";
+  points: Point[];
+  ariaLabel: string;
+}): ReactNode {
   const W = 480;
   const H = 160;
   const PAD = 8;
@@ -293,7 +350,13 @@ function ChartBody({ kind, points }: { kind: "bar" | "line" | "area"; points: Po
   if (kind === "bar") {
     const bw = innerW / points.length;
     return (
-      <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full h-auto" role="img">
+      <svg
+        viewBox={`0 0 ${W} ${H + 20}`}
+        className="w-full h-auto"
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <title>{ariaLabel}</title>
         {points.map((p, i) => {
           const h = (p.value / max) * innerH;
           return (
@@ -331,7 +394,13 @@ function ChartBody({ kind, points }: { kind: "bar" | "line" | "area"; points: Po
   const areaPath = `${linePath} L${PAD + innerW},${PAD + innerH} L${PAD},${PAD + innerH} Z`;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full h-auto" role="img">
+    <svg
+      viewBox={`0 0 ${W} ${H + 20}`}
+      className="w-full h-auto"
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <title>{ariaLabel}</title>
       {kind === "area" && (
         <motion.path
           d={areaPath}

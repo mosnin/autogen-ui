@@ -19,6 +19,8 @@ export interface UseStreamingDashboardResult {
   messages: ChatMessage[];
   isLoading: boolean;
   error: string | null;
+  /** Patch-target warnings accumulated during the most recent stream. */
+  warnings: string[];
   /** Send a user turn; applies streamed patches to the dashboard as they arrive. */
   sendMessage: (content: string) => Promise<void>;
   /** Abort an in-flight stream, if any. */
@@ -51,6 +53,7 @@ export function useStreamingDashboard(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -79,6 +82,7 @@ export function useStreamingDashboard(
       setMessages(nextMessages);
       setIsLoading(true);
       setError(null);
+      setWarnings([]);
 
       try {
         const res = await doFetch(endpoint, {
@@ -116,6 +120,8 @@ export function useStreamingDashboard(
                 return next;
               });
             }
+          } else if (frame.kind === "warning") {
+            setWarnings((prev) => [...prev, frame.warning]);
           } else if (frame.kind === "error") {
             streamError = frame.error;
           }
@@ -139,6 +145,7 @@ export function useStreamingDashboard(
     setMessages([]);
     setDashboard(initial.current);
     setError(null);
+    setWarnings([]);
   }, []);
 
   return {
@@ -146,6 +153,7 @@ export function useStreamingDashboard(
     messages,
     isLoading,
     error,
+    warnings,
     sendMessage,
     cancel,
     setDashboard,

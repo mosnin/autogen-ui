@@ -353,11 +353,13 @@ export type AgentRequest = z.infer<typeof agentRequestSchema>;
 
 /**
  * Streaming envelope. A streaming turn emits a sequence of these frames so
- * the client can apply patches as they arrive (Phase 2).
+ * the client can apply patches as they arrive (Phase 2). `warning` frames
+ * surface non-fatal issues (e.g. patches targeting unknown ids).
  */
 export const streamFrameSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("patch"), patch: patchSchema }),
   z.object({ kind: z.literal("message"), delta: z.string() }),
+  z.object({ kind: z.literal("warning"), warning: z.string() }),
   z.object({ kind: z.literal("error"), error: z.string() }),
   z.object({ kind: z.literal("done") }),
 ]);

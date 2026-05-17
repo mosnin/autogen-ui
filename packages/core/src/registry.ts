@@ -1,5 +1,8 @@
 import { Box, Icon, Image, Spacer } from "./components/box";
 import { Checkbox, Form, Input, Select, Switch, Textarea } from "./components/forms";
+import { Avatar, CodeBlock, Kbd, Quote, Skeleton } from "./components/media";
+import { Accordion, Breadcrumb, Link, Tabs } from "./components/navigation";
+import { Modal, Tooltip } from "./components/overlays";
 import {
   Badge,
   Button,
@@ -182,6 +185,76 @@ export const componentCatalog: ComponentDoc[] = [
     props: "(none)",
     acceptsChildren: true,
   },
+  {
+    type: "Tabs",
+    description:
+      "Tabbed container. Child at index N corresponds to tabs[N]. Bind `value` to state and wire `onChange` with `{{event.value}}` to switch the active tab.",
+    props: "tabs: {value:string,label:string}[], value?: string",
+    acceptsChildren: true,
+  },
+  {
+    type: "Accordion",
+    description:
+      "Collapsible sections. Child at index N maps to items[N]. Bind `openValues` to a string[] in state and wire `onChange` with a toggleState action driven by `{{event.value}}`.",
+    props: "items: {value:string,label:string}[], openValues?: string[]",
+    acceptsChildren: true,
+  },
+  {
+    type: "Link",
+    description: "Anchor link. Opens in a new tab when `newTab` is true.",
+    props: "href: string, text: string, newTab?: boolean",
+    acceptsChildren: false,
+  },
+  {
+    type: "Breadcrumb",
+    description: "Breadcrumb trail. Last item is plain text, earlier items are links if `href` is set.",
+    props: "items: {label:string, href?:string}[]",
+    acceptsChildren: false,
+  },
+  {
+    type: "Modal",
+    description:
+      "Dialog overlay. Bind `open` to a boolean in state to show/hide. Wire `onClose` to a setState/toggleState action to dismiss when the backdrop or close button is clicked.",
+    props: "open?: boolean, title?: string",
+    acceptsChildren: true,
+  },
+  {
+    type: "Tooltip",
+    description: "Wraps a child and shows a small dark popover with `text` on hover.",
+    props: "text: string, side?: 'top'|'bottom'|'left'|'right'",
+    acceptsChildren: true,
+  },
+  {
+    type: "Avatar",
+    description:
+      "User avatar. Shows the image at `src`, or falls back to initials from `name`. Optional online indicator.",
+    props: "src?: string, name?: string, size?: 'sm'|'md'|'lg'|'xl', online?: boolean",
+    acceptsChildren: false,
+  },
+  {
+    type: "Skeleton",
+    description: "Animated placeholder bars used while content is loading.",
+    props: "lines?: number (default 1), height?: 'sm'|'md'|'lg'",
+    acceptsChildren: false,
+  },
+  {
+    type: "CodeBlock",
+    description: "Monospaced code block with a language pill in the top-right (label only, no highlighting).",
+    props: "code: string, language?: string",
+    acceptsChildren: false,
+  },
+  {
+    type: "Quote",
+    description: "Left-bordered blockquote with optional author footer.",
+    props: "text: string, author?: string",
+    acceptsChildren: false,
+  },
+  {
+    type: "Kbd",
+    description: "Inline keyboard hint, e.g. '⌘ + K' or 'Ctrl + S'. Splits on '+'.",
+    props: "keys: string",
+    acceptsChildren: false,
+  },
 ];
 
 /** Built-in component registry mapping spec `type` -> React component. */
@@ -210,6 +283,17 @@ export const defaultRegistry: ComponentRegistry = {
   Checkbox,
   Switch,
   Form,
+  Tabs,
+  Accordion,
+  Link,
+  Breadcrumb,
+  Modal,
+  Tooltip,
+  Avatar,
+  Skeleton,
+  CodeBlock,
+  Quote,
+  Kbd,
 };
 
 /** Merge custom components onto the defaults. Custom entries win on conflict. */

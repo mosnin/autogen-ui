@@ -6,10 +6,12 @@ import {
   type CapabilityModule,
 } from "./agent";
 import type { LLMClient } from "./llm";
+import { applyPatch, validatePatchTargets } from "./patch";
 import type { ComponentDoc } from "./registry";
 import {
   agentRequestSchema,
   agentResponseSchema,
+  emptyDashboard,
   patchSchema,
   type AgentRequest,
   type StreamFrame,
@@ -62,6 +64,8 @@ export function createStreamingUIAgent({
         toolChoice: { name: EMIT_PATCHES_TOOL.name },
       };
 
+      let currentDashboard = parsed.dashboard ?? emptyDashboard();
+
       // Streaming path
       if (client.stream) {
         const parser = createPatchStreamParser();
@@ -87,7 +91,10 @@ export function createStreamingUIAgent({
                 }
                 const result = patchSchema.safeParse(candidate);
                 if (result.success) {
+                  const warnings = validatePatchTargets(currentDashboard, [result.data]);
+                  for (const w of warnings) yield { kind: "warning", warning: w };
                   yield { kind: "patch", patch: result.data };
+                  currentDashboard = applyPatch(currentDashboard, result.data);
                 } else {
                   yield {
                     kind: "error",
@@ -130,7 +137,10 @@ export function createStreamingUIAgent({
           yield { kind: "message", delta: validated.data.message };
         }
         for (const patch of validated.data.patches) {
+          const warnings = validatePatchTargets(currentDashboard, [patch]);
+          for (const w of warnings) yield { kind: "warning", warning: w };
           yield { kind: "patch", patch };
+          currentDashboard = applyPatch(currentDashboard, patch);
         }
       } catch (err) {
         yield { kind: "error", error: err instanceof Error ? err.message : String(err) };

@@ -558,6 +558,205 @@ function test(name: string, ok: boolean, detail = "") {
   }
 }
 
+// ---------- 11. repairOnWarnings retries when targets are hallucinated.
+{
+  process.stdout.write("\n# repairOnWarnings: retry on warnings\n");
+  let secondUserMessage = "";
+  const fake = createFakeClient([
+    // First call: targets a ghost id → produces warnings.
+    {
+      message: "first try",
+      patches: [{ op: "update", id: "ghost", props: { x: 1 } }],
+    },
+    // Second call (the repair): capture the most recent user message and
+    // return a clean patch that targets the existing root.
+    (req) => {
+      const last = req.messages[req.messages.length - 1];
+      if (last && typeof last.content === "string") secondUserMessage = last.content;
+      return {
+        message: "repaired",
+        patches: [{ op: "setTitle", title: "OK" }],
+      };
+    },
+  ]);
+  const agent = createUIAgent({ client: fake, repairOnWarnings: true });
+  const result = await agent.run({
+    messages: [{ role: "user", content: "edit something" }],
+    dashboard: emptyDashboard(),
+  });
+  test("second response wins", result.message === "repaired");
+  test("clean result has no warnings", !result.warnings || result.warnings.length === 0);
+  test(
+    "repair user message names the hallucinated id",
+    secondUserMessage.includes("ghost"),
+  );
+  test(
+    "repair user message asks to re-call with existing ids",
+    secondUserMessage.includes("Re-call emit_patches") &&
+      secondUserMessage.includes("only ids that exist"),
+  );
+}
+
+// ---------- 12. repairOnWarnings exhausts: warnings still attached, no throw.
+{
+  process.stdout.write("\n# repairOnWarnings: exhaustion attaches warnings\n");
+  const ghostPatch = { op: "update", id: "ghost", props: { x: 1 } };
+  const fake = createFakeClient([
+    { message: "1", patches: [ghostPatch] },
+    { message: "2", patches: [ghostPatch] },
+    { message: "3", patches: [ghostPatch] },
+  ]);
+  const agent = createUIAgent({
+    client: fake,
+    repairOnWarnings: true,
+    maxRepairAttempts: 2,
+  });
+  let threw = false;
+  let result: Awaited<ReturnType<typeof agent.run>> | null = null;
+  try {
+    result = await agent.run({
+      messages: [{ role: "user", content: "x" }],
+      dashboard: emptyDashboard(),
+    });
+  } catch {
+    threw = true;
+  }
+  test("does not throw after exhaustion", !threw);
+  test(
+    "final response carries warnings",
+    !!result && Array.isArray(result.warnings) && result.warnings.length === 1,
+  );
+}
+
+// ---------- 13. Default repairOnWarnings=false: warnings present, no retry.
+{
+  process.stdout.write("\n# repairOnWarnings: default false\n");
+  let calls = 0;
+  const fake = createFakeClient([
+    (_req) => {
+      calls++;
+      return {
+        message: "only call",
+        patches: [{ op: "update", id: "ghost", props: { x: 1 } }],
+      };
+    },
+    // A second script entry that, if consumed, would prove an unwanted retry.
+    (_req) => {
+      calls++;
+      return { message: "should not happen", patches: [] };
+    },
+  ]);
+  const agent = createUIAgent({ client: fake });
+  const result = await agent.run({
+    messages: [{ role: "user", content: "x" }],
+    dashboard: emptyDashboard(),
+  });
+  test("agent called exactly once (no retry)", calls === 1);
+  test(
+    "warnings still attached to first response",
+    Array.isArray(result.warnings) && result.warnings.length === 1,
+  );
+  test("first message preserved", result.message === "only call");
+}
+
+// ---------- 14. Streaming agent yields warning frames for hallucinated ids.
+{
+  process.stdout.write("\n# streaming agent: warning frames\n");
+  const fakeStreamClient: LLMClient = {
+    name: "fake-stream",
+    async complete() {
+      throw new Error("unused");
+    },
+    async *stream() {
+      yield { kind: "tool_start", id: "t1", name: "emit_patches" } as LLMEvent;
+      yield {
+        kind: "tool_input_delta",
+        id: "t1",
+        partialJson:
+          '{"message":"","patches":[{"op":"update","id":"ghost","props":{"x":1}}]}',
+      } as LLMEvent;
+      yield { kind: "done" } as LLMEvent;
+    },
+  };
+  const agent = createStreamingUIAgent({ client: fakeStreamClient });
+  const frames = [];
+  for await (const f of agent.runStream({
+    messages: [{ role: "user", content: "x" }],
+    dashboard: emptyDashboard(),
+  })) {
+    frames.push(f);
+  }
+  const warningFrames = frames.filter((f) => f.kind === "warning");
+  const patchFrames = frames.filter((f) => f.kind === "patch");
+  const lastFrame = frames[frames.length - 1];
+  test("at least one warning frame yielded", warningFrames.length >= 1);
+  test(
+    "warning mentions the hallucinated id",
+    warningFrames.some(
+      (f) => f.kind === "warning" && /ghost/.test(f.warning),
+    ),
+  );
+  test("patch frame still yielded after warning", patchFrames.length === 1);
+  const warningIdx = frames.findIndex((f) => f.kind === "warning");
+  const patchIdx = frames.findIndex((f) => f.kind === "patch");
+  test("warning ordered before patch", warningIdx !== -1 && warningIdx < patchIdx);
+  test("suite ends with done", lastFrame?.kind === "done");
+}
+
+// ---------- 15. shallowEqual: powers the renderer's stable-reference memo.
+{
+  process.stdout.write("\n# shallowEqual helper\n");
+  const { shallowEqual } = await import("../src/_shallow");
+
+  test("identical reference is equal", shallowEqual({ a: 1 }, { a: 1 }) === true);
+  test("two undefineds are equal", shallowEqual(undefined, undefined) === true);
+  test("undefined vs object is not equal", shallowEqual(undefined, {}) === false);
+  test("different value at same key is not equal", shallowEqual({ a: 1 }, { a: 2 }) === false);
+  test(
+    "extra key on the right side is not equal",
+    shallowEqual({ a: 1 }, { a: 1, b: 2 }) === false,
+  );
+  test(
+    "function identity matters (different fn refs)",
+    shallowEqual({ f: () => 1 }, { f: () => 1 }) === false,
+  );
+  const fn = () => 1;
+  test(
+    "function identity matters (same fn ref)",
+    shallowEqual({ f: fn }, { f: fn }) === true,
+  );
+  // The footgun case: two distinct empty-object literals.
+  test("two empty-object literals are equal", shallowEqual({}, {}) === true);
+}
+
+// ---------- 16. Heading: text yields a stable, slugified id.
+{
+  process.stdout.write("\n# Heading id slug\n");
+  const React = await import("react");
+  const { Heading } = await import("../src/components/primitives");
+
+  // Function components can be invoked directly as functions. The result
+  // is a ReactElement whose `.props.id` we can inspect without rendering.
+  const el = (Heading as unknown as (p: Record<string, unknown>) => unknown)({
+    text: "Hello World!",
+  });
+  test("Heading returns a React element", React.isValidElement(el));
+  const props =
+    React.isValidElement(el) && typeof el.props === "object" && el.props !== null
+      ? (el.props as { id?: unknown })
+      : {};
+  test("Heading id is slugified from text", props.id === "hello-world");
+
+  const empty = (Heading as unknown as (p: Record<string, unknown>) => unknown)({
+    text: "",
+  });
+  const emptyProps =
+    React.isValidElement(empty) && typeof empty.props === "object" && empty.props !== null
+      ? (empty.props as { id?: unknown })
+      : {};
+  test("Heading id is omitted when text is empty", emptyProps.id === undefined);
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {
