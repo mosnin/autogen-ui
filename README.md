@@ -309,6 +309,15 @@ The architecture and runtime are in place; every layer is exercised by the
 test suite. Remaining work is mostly polish: npm publication, multi-framework
 docs, a Vite example, and stress-testing prompt adherence with real models.
 
+## Module formats
+
+Starting with `0.3.0-pre`, `@autogen-ui/core` ships a dual ESM + CJS build.
+Modern bundlers and Node `import` continue to resolve the ESM entry
+(`dist/*.js`), while legacy bundlers, Node `require`, and pre-ESM Jest setups
+can now consume the CommonJS entry (`dist/*.cjs`). Both formats are emitted
+file-for-file from source so that Next.js RSC continues to see the per-file
+`"use client"` directives on client modules.
+
 ## License
 
 MIT

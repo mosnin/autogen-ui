@@ -757,6 +757,442 @@ function test(name: string, ok: boolean, detail = "") {
   test("Heading id is omitted when text is empty", emptyProps.id === undefined);
 }
 
+// ---------- 17. New provider adapters: Ollama, Groq, and SDK wrappers.
+{
+  process.stdout.write("\n# provider adapters\n");
+
+  const {
+    createOllamaClient,
+    createGroqClient,
+    wrapAnthropicSdk,
+    wrapOpenAiSdk,
+  } = await import("../src/clients/index");
+
+  type FetchRecord = { url: string; body: unknown };
+
+  function installFetchMock(responder: (req: FetchRecord) => Response) {
+    const calls: FetchRecord[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const url = typeof input === "string" ? input : input.toString();
+      let body: unknown = undefined;
+      const rawBody = init?.body;
+      if (typeof rawBody === "string") {
+        try {
+          body = JSON.parse(rawBody);
+        } catch {
+          body = rawBody;
+        }
+      }
+      const record: FetchRecord = { url, body };
+      calls.push(record);
+      return responder(record);
+    }) as typeof fetch;
+    return {
+      calls,
+      restore: () => {
+        globalThis.fetch = originalFetch;
+      },
+    };
+  }
+
+  // --- Ollama: /api/chat with a tool_call response.
+  {
+    const mock = installFetchMock(() =>
+      new Response(
+        JSON.stringify({
+          model: "llama3.2",
+          done: true,
+          message: {
+            role: "assistant",
+            content: "",
+            tool_calls: [
+              {
+                function: {
+                  name: "emit_patches",
+                  arguments: { message: "hi", patches: [] },
+                },
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    try {
+      const client = createOllamaClient({ model: "llama3.2" });
+      const result = await client.complete({
+        system: "you are a builder",
+        messages: [{ role: "user", content: "build" }],
+        tools: [
+          {
+            name: "emit_patches",
+            description: "Emit patches.",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+        toolChoice: { name: "emit_patches" },
+      });
+      const firstCall = mock.calls[0];
+      test(
+        "ollama hits /api/chat",
+        firstCall !== undefined && firstCall.url.endsWith("/api/chat"),
+      );
+      const tc = result.toolCalls[0];
+      test(
+        "ollama parses tool_calls",
+        result.toolCalls.length === 1 && tc !== undefined && tc.name === "emit_patches",
+      );
+    } finally {
+      mock.restore();
+    }
+  }
+
+  // --- Groq: OpenAI-shaped /openai/v1/chat/completions.
+  {
+    const mock = installFetchMock(() =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_abc",
+                    type: "function",
+                    function: {
+                      name: "emit_patches",
+                      arguments: JSON.stringify({
+                        message: "ok",
+                        patches: [],
+                      }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    try {
+      const client = createGroqClient({ apiKey: "fake-key" });
+      const result = await client.complete({
+        system: "be helpful",
+        messages: [{ role: "user", content: "go" }],
+        tools: [
+          {
+            name: "emit_patches",
+            description: "Emit patches.",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+        toolChoice: { name: "emit_patches" },
+      });
+      const firstCall = mock.calls[0];
+      test(
+        "groq hits /openai/v1/chat/completions",
+        firstCall !== undefined &&
+          firstCall.url.endsWith("/openai/v1/chat/completions"),
+      );
+      const tc = result.toolCalls[0];
+      const input = tc?.input as { message?: string } | undefined;
+      test(
+        "groq parses tool_calls + arguments JSON",
+        result.toolCalls.length === 1 &&
+          tc !== undefined &&
+          tc.id === "call_abc" &&
+          input?.message === "ok",
+      );
+    } finally {
+      mock.restore();
+    }
+  }
+
+  // --- wrapAnthropicSdk with a minimal fake SDK.
+  {
+    let lastBody: Record<string, unknown> | undefined;
+    const fakeSdk = {
+      messages: {
+        async create(body: Record<string, unknown>) {
+          lastBody = body;
+          return {
+            content: [
+              {
+                type: "tool_use",
+                id: "toolu_1",
+                name: "emit_patches",
+                input: { message: "from-anthropic-sdk", patches: [] },
+              },
+            ],
+          };
+        },
+        stream(_body: Record<string, unknown>) {
+          const events: Array<Record<string, unknown>> = [];
+          return {
+            [Symbol.asyncIterator]() {
+              let i = 0;
+              return {
+                async next() {
+                  if (i < events.length) {
+                    return { value: events[i++], done: false };
+                  }
+                  return { value: undefined, done: true };
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+    const client = wrapAnthropicSdk(fakeSdk);
+    const result = await client.complete({
+      system: [
+        { text: "stable preamble", cache: true },
+        { text: "per-request" },
+      ],
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "emit_patches",
+          description: "Emit patches.",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+      toolChoice: { name: "emit_patches" },
+    });
+    const tc = result.toolCalls[0];
+    const input = tc?.input as { message?: string } | undefined;
+    test(
+      "anthropic SDK wrapper returns tool call",
+      result.toolCalls.length === 1 &&
+        tc?.id === "toolu_1" &&
+        input?.message === "from-anthropic-sdk",
+    );
+    const sys = (lastBody?.system ?? []) as Array<{
+      text?: string;
+      cache_control?: { type?: string };
+    }>;
+    test(
+      "anthropic SDK wrapper forwards cache_control on cacheable segments",
+      Array.isArray(sys) &&
+        sys[0]?.cache_control?.type === "ephemeral" &&
+        sys[1]?.cache_control === undefined,
+    );
+  }
+
+  // --- wrapOpenAiSdk with a minimal fake SDK.
+  {
+    let lastBody: Record<string, unknown> | undefined;
+    const fakeSdk = {
+      chat: {
+        completions: {
+          async create(body: Record<string, unknown>) {
+            lastBody = body;
+            return {
+              choices: [
+                {
+                  message: {
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: "call_xyz",
+                        function: {
+                          name: "emit_patches",
+                          arguments: JSON.stringify({
+                            message: "from-openai-sdk",
+                            patches: [],
+                          }),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            };
+          },
+        },
+      },
+    };
+    const client = wrapOpenAiSdk(fakeSdk);
+    const result = await client.complete({
+      system: "stable preamble",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [
+        {
+          name: "emit_patches",
+          description: "Emit patches.",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+      toolChoice: { name: "emit_patches" },
+    });
+    const tc = result.toolCalls[0];
+    const input = tc?.input as { message?: string } | undefined;
+    test(
+      "openai SDK wrapper returns tool call",
+      result.toolCalls.length === 1 &&
+        tc?.id === "call_xyz" &&
+        input?.message === "from-openai-sdk",
+    );
+    const toolChoice = lastBody?.tool_choice as
+      | { type?: string; function?: { name?: string } }
+      | undefined;
+    test(
+      "openai SDK wrapper forwards tool_choice",
+      toolChoice?.type === "function" &&
+        toolChoice?.function?.name === "emit_patches",
+    );
+  }
+}
+
+// ---------- 18. Per-component prop schemas validate node.props shape.
+{
+  process.stdout.write("\n# component prop schemas\n");
+  const { validateNodeProps, validatePatchProps, mergeSchemas, builtinPropSchemas } =
+    await import("../src/component-schemas");
+
+  // Stat: required fields present → null.
+  test(
+    "Stat with label+value validates",
+    validateNodeProps({ type: "Stat", props: { label: "x", value: 10 } }) === null,
+  );
+
+  // Stat missing required `value` → warning mentions value.
+  {
+    const warning = validateNodeProps({ type: "Stat", props: { label: "x" } });
+    test(
+      "Stat missing value is flagged",
+      typeof warning === "string" && /value/.test(warning),
+      warning ?? "(no warning)",
+    );
+  }
+
+  // Chart with proper kind/data → null.
+  test(
+    "Chart with bar+data validates",
+    validateNodeProps({ type: "Chart", props: { kind: "bar", data: [] } }) === null,
+  );
+
+  // Chart with invalid kind → warning mentions kind.
+  {
+    const warning = validateNodeProps({ type: "Chart", props: { kind: "lol" } });
+    test(
+      "Chart with invalid kind is flagged",
+      typeof warning === "string" && /kind/.test(warning),
+      warning ?? "(no warning)",
+    );
+  }
+
+  // Unknown component type passes through (handled elsewhere).
+  test(
+    "unknown type passes through",
+    validateNodeProps({ type: "Unknown", props: {} }) === null,
+  );
+
+  // validatePatchProps walks children and surfaces nested invalid nodes.
+  {
+    const warnings = validatePatchProps([
+      {
+        op: "append",
+        parentId: "root",
+        node: {
+          id: "x",
+          type: "Stat",
+          props: { label: "a", value: 1 },
+          children: [{ id: "y", type: "Badge", props: {} }],
+        },
+      },
+    ]);
+    test(
+      "validatePatchProps catches nested invalid Badge",
+      warnings.some((w) => /Badge/.test(w) && /label/.test(w)),
+      warnings.join(" | ") || "(no warnings)",
+    );
+  }
+
+  // setRoot is also walked.
+  {
+    const warnings = validatePatchProps([
+      {
+        op: "setRoot",
+        node: {
+          id: "root",
+          type: "Grid",
+          props: { gap: 4 },
+          children: [
+            { id: "h", type: "Heading", props: {} as Record<string, never> },
+          ],
+        },
+      },
+    ]);
+    test(
+      "validatePatchProps flags missing Heading.text via setRoot",
+      warnings.some((w) => /Heading/.test(w) && /text/.test(w)),
+      warnings.join(" | ") || "(no warnings)",
+    );
+  }
+
+  // update patches are not flagged by validatePatchProps (deferred to host).
+  {
+    const warnings = validatePatchProps([
+      { op: "update", id: "x", props: { kind: "lol" } as Record<string, never> },
+    ]);
+    test("validatePatchProps skips update ops", warnings.length === 0);
+  }
+
+  // Bindable required field: when bindings carry it, no warning surfaces.
+  // Stat.value is required; supplying it via bindings should suppress the
+  // missing-field error.
+  test(
+    "Stat with bindings.value validates without literal",
+    validateNodeProps({
+      type: "Stat",
+      props: { label: "p" },
+      bindings: { value: "{{state.total}}" },
+    }) === null,
+  );
+
+  // mergeSchemas: custom entries win and validate normally.
+  {
+    const { z } = await import("zod");
+    const merged = mergeSchemas({
+      MyWidget: z.object({ title: z.string() }).passthrough(),
+    });
+    test(
+      "mergeSchemas: custom schema validates",
+      validateNodeProps({ type: "MyWidget", props: { title: "ok" } }, merged) === null,
+    );
+    const warn = validateNodeProps(
+      { type: "MyWidget", props: {} },
+      merged,
+    );
+    test(
+      "mergeSchemas: custom schema flags missing required",
+      typeof warn === "string" && /title/.test(warn),
+      warn ?? "(no warning)",
+    );
+  }
+
+  // Built-in schemas cover every type currently in the registry.
+  {
+    const { defaultRegistry } = await import("../src/registry");
+    const missing = Object.keys(defaultRegistry).filter(
+      (t) => !(t in builtinPropSchemas),
+    );
+    test(
+      "builtinPropSchemas covers every registered component",
+      missing.length === 0,
+      missing.length ? `missing: ${missing.join(", ")}` : "",
+    );
+  }
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

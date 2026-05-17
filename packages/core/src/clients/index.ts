@@ -409,3 +409,11 @@ async function* readOpenAiSse(body: ReadableStream<Uint8Array>): AsyncIterable<s
     }
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Additional providers + SDK wrappers
+ * ------------------------------------------------------------------ */
+
+export { createOllamaClient, type OllamaClientOptions } from "./ollama";
+export { createGroqClient, type GroqClientOptions } from "./groq";
+export { wrapAnthropicSdk, wrapOpenAiSdk } from "./sdk-wrappers";

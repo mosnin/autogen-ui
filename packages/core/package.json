@@ -28,29 +28,34 @@
     "url": "https://github.com/mosnin/autogen-ui/issues"
   },
   "homepage": "https://github.com/mosnin/autogen-ui#readme",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./server": {
       "types": "./dist/server.d.ts",
-      "import": "./dist/server.js"
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
     },
     "./node": {
       "types": "./dist/node.d.ts",
-      "import": "./dist/node.js"
+      "import": "./dist/node.js",
+      "require": "./dist/node.cjs"
     },
     "./clients": {
       "types": "./dist/clients/index.d.ts",
-      "import": "./dist/clients/index.js"
+      "import": "./dist/clients/index.js",
+      "require": "./dist/clients/index.cjs"
     },
     "./style": {
       "types": "./dist/style.d.ts",
       "import": "./dist/style.js",
+      "require": "./dist/style.cjs",
       "default": "./dist/style.js"
     },
     "./styles.css": "./src/styles.css",
@@ -69,7 +74,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx scripts/run-eval.ts",
     "smoke:llm": "tsx scripts/real-llm-smoke.ts",
@@ -93,6 +98,7 @@
     "framer-motion": "^11.11.17",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.6.3"
   },
   "publishConfig": {
