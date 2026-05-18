@@ -1,7 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
+import { useEffect, type ReactNode } from "react";
+import { EASE_OUT } from "../_easing";
 import { cn } from "../utils";
 import { arr, bool, num, oneOf, str } from "./helpers";
 import type { RegistryComponent } from "./types";
@@ -73,12 +74,14 @@ export const Section: RegistryComponent = ({ children, title, description }) => 
   </section>
 );
 
-/** shadcn-style card. Use `span` (1-12) to size it within a Grid. */
+/** Card with refined depth and a 1px hover lift. Size with `span` (1-12). */
 export const Card: RegistryComponent = ({ children, title, description }) => (
-  <div
+  <motion.div
+    whileHover={{ y: -1 }}
+    transition={{ duration: 0.18, ease: EASE_OUT }}
     className={cn(
-      "rounded-xl border border-border bg-card text-card-foreground shadow-sm",
-      "p-5 flex flex-col gap-3 h-full",
+      "rounded-lg border border-border bg-card text-card-foreground shadow-rest",
+      "p-5 flex flex-col gap-3 h-full transition-shadow duration-200 hover:shadow-lift",
     )}
   >
     {(str(title) || str(description)) && (
@@ -90,38 +93,103 @@ export const Card: RegistryComponent = ({ children, title, description }) => (
       </div>
     )}
     {children}
-  </div>
+  </motion.div>
 );
 
 /* ------------------------------------------------------------------ *
  * Display
  * ------------------------------------------------------------------ */
 
-/** A KPI / metric tile: label, big value, optional delta. */
-export const Stat: RegistryComponent = ({ label, value, delta, trend }) => {
+/** Count-up animation for numeric values. Renders the formatted string. */
+function CountUpNumber({ value, format }: { value: number; format: (n: number) => string }) {
+  const motionValue = useMotionValue(value);
+  const rounded = useTransform(motionValue, (latest) => format(latest));
+  useEffect(() => {
+    const controls = animate(motionValue, value, {
+      duration: 0.7,
+      ease: EASE_OUT,
+    });
+    return controls.stop;
+  }, [value, motionValue]);
+  return <motion.span>{rounded}</motion.span>;
+}
+
+/** Tiny inline sparkline from `number[]`. Uses chart-1. */
+function StatSparkline({ data }: { data: number[] }) {
+  if (data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const W = 80;
+  const H = 22;
+  const step = W / (data.length - 1);
+  const path = data
+    .map((v, i) => {
+      const x = i * step;
+      const y = H - ((v - min) / range) * H;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-5 w-20 text-chart-1" aria-hidden>
+      <motion.path
+        d={path}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: 0.6, ease: EASE_OUT, delay: 0.15 }}
+      />
+    </svg>
+  );
+}
+
+/**
+ * A KPI tile. Numeric `value` counts up on first render and on change.
+ * `sparkline?: number[]` adds a tiny inline trend.
+ */
+export const Stat: RegistryComponent = ({ label, value, delta, trend, sparkline }) => {
   const t = oneOf(trend, ["up", "down", "flat"] as const, "flat");
   const labelText = str(label, "Metric");
-  const valueText = typeof value === "number" ? value.toLocaleString() : str(value, "—");
+  const numericValue = typeof value === "number" ? value : NaN;
+  const isNumeric = Number.isFinite(numericValue);
+  const fallbackText = isNumeric ? numericValue.toLocaleString() : str(value, "—");
+  const spark = arr<unknown>(sparkline)
+    .map((n) => (typeof n === "number" ? n : Number(n)))
+    .filter((n) => Number.isFinite(n));
+
   return (
-    <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-1 h-full">
-      <span className="text-sm text-muted-foreground">{labelText}</span>
+    <div className="group rounded-lg border border-border bg-card p-5 flex flex-col gap-1.5 h-full shadow-rest transition-shadow duration-200 hover:shadow-lift">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {labelText}
+        </span>
+        {spark.length > 1 && <StatSparkline data={spark} />}
+      </div>
       <span
         role="text"
-        aria-label={`${labelText}: ${valueText}`}
-        className="text-2xl font-semibold tracking-tight"
+        aria-label={`${labelText}: ${fallbackText}`}
+        className="font-tabular font-display text-3xl font-semibold tracking-tight leading-tight"
       >
-        {valueText}
+        {isNumeric ? (
+          <CountUpNumber value={numericValue} format={(n) => Math.round(n).toLocaleString()} />
+        ) : (
+          fallbackText
+        )}
       </span>
       {str(delta) && (
         <span
           className={cn(
-            "text-xs font-medium",
-            t === "up" && "text-emerald-600 dark:text-emerald-400",
-            t === "down" && "text-rose-600 dark:text-rose-400",
+            "text-xs font-medium font-tabular inline-flex items-center gap-1",
+            t === "up" && "text-success",
+            t === "down" && "text-danger",
             t === "flat" && "text-muted-foreground",
           )}
         >
-          {t === "up" ? "▲ " : t === "down" ? "▼ " : ""}
+          {t === "up" ? "↑ " : t === "down" ? "↓ " : ""}
           {str(delta)}
         </span>
       )}
@@ -347,6 +415,25 @@ function ChartBody({
   const innerW = W - PAD * 2;
   const innerH = H - PAD * 2;
 
+  // Dotted reference grid — 3 horizontal lines for a sense of scale.
+  const grid = [0.33, 0.66, 1].map((f) => PAD + innerH - innerH * f);
+  const gridLines = (
+    <g aria-hidden>
+      {grid.map((y, i) => (
+        <line
+          key={i}
+          x1={PAD}
+          x2={PAD + innerW}
+          y1={y}
+          y2={y}
+          className="stroke-border"
+          strokeWidth={1}
+          strokeDasharray="2 4"
+        />
+      ))}
+    </g>
+  );
+
   if (kind === "bar") {
     const bw = innerW / points.length;
     return (
@@ -357,24 +444,31 @@ function ChartBody({
         aria-label={ariaLabel}
       >
         <title>{ariaLabel}</title>
+        <defs>
+          <linearGradient id="bar-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="1" />
+            <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0.7" />
+          </linearGradient>
+        </defs>
+        {gridLines}
         {points.map((p, i) => {
           const h = (p.value / max) * innerH;
           return (
             <g key={i}>
               <motion.rect
-                x={PAD + i * bw + bw * 0.15}
-                width={bw * 0.7}
-                rx={4}
-                className="fill-primary"
+                x={PAD + i * bw + bw * 0.18}
+                width={bw * 0.64}
+                rx={3}
+                fill="url(#bar-grad)"
                 initial={{ height: 0, y: PAD + innerH }}
                 animate={{ height: h, y: PAD + innerH - h }}
-                transition={{ type: "spring", stiffness: 120, damping: 18, delay: i * 0.03 }}
+                transition={{ duration: 0.5, ease: EASE_OUT, delay: i * 0.04 }}
               />
               <text
                 x={PAD + i * bw + bw / 2}
                 y={H + 14}
                 textAnchor="middle"
-                className="fill-muted-foreground text-[10px]"
+                className="fill-muted-foreground text-[10px] font-tabular"
               >
                 {p.label}
               </text>
@@ -401,29 +495,44 @@ function ChartBody({
       aria-label={ariaLabel}
     >
       <title>{ariaLabel}</title>
+      <defs>
+        <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {gridLines}
       {kind === "area" && (
         <motion.path
           d={areaPath}
-          className="fill-primary/15"
+          fill="url(#area-grad)"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.1 }}
         />
       )}
       <motion.path
         d={linePath}
         fill="none"
-        strokeWidth={2.5}
-        className="stroke-primary"
+        strokeWidth={2}
+        className="stroke-chart-1"
         strokeLinecap="round"
         strokeLinejoin="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.6, ease: "easeInOut" }}
+        transition={{ duration: 0.7, ease: EASE_OUT }}
       />
       {coords.map((c, i) => (
         <g key={i}>
-          <circle cx={c.x} cy={c.y} r={3} className="fill-primary" />
+          <motion.circle
+            cx={c.x}
+            cy={c.y}
+            r={3}
+            className="fill-chart-1"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.3, ease: EASE_OUT, delay: 0.5 + i * 0.04 }}
+          />
           <text
             x={c.x}
             y={H + 14}

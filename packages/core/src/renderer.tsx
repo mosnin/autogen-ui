@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo } from "react";
+import { EASE_EXIT, EASE_OUT, ENTRANCE_DURATION, STAGGER_MS } from "./_easing";
 import { useShallowMemo } from "./_shallow";
 import { NodeErrorBoundary } from "./components/error-boundary";
 import type { ComponentRegistry } from "./components/types";
@@ -99,17 +100,33 @@ interface RenderNodeProps {
   ext: Required<RendererExtensions>;
   ctx: RuntimeContext;
   isRoot?: boolean;
+  /** Sibling index within the parent, used for stagger. */
+  siblingIndex?: number;
 }
 
-function RenderNode({ node: rawNode, registry, ext, ctx, isRoot }: RenderNodeProps) {
+function RenderNode({
+  node: rawNode,
+  registry,
+  ext,
+  ctx,
+  isRoot,
+  siblingIndex = 0,
+}: RenderNodeProps) {
   const node = resolve(rawNode, ext, ctx);
   const Comp = registry[node.type];
 
   const renderedChildren =
     node.children && node.children.length > 0 ? (
       <AnimatePresence mode="popLayout" initial={false}>
-        {node.children.map((child) => (
-          <RenderNode key={child.id} node={child} registry={registry} ext={ext} ctx={ctx} />
+        {node.children.map((child, i) => (
+          <RenderNode
+            key={child.id}
+            node={child}
+            registry={registry}
+            ext={ext}
+            ctx={ctx}
+            siblingIndex={i}
+          />
         ))}
       </AnimatePresence>
     ) : undefined;
@@ -135,10 +152,19 @@ function RenderNode({ node: rawNode, registry, ext, ctx, isRoot }: RenderNodePro
       layoutId={node.id}
       className={cn(spanClass(node), "min-w-0", compiledStyle.className)}
       style={compiledStyle.style}
-      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
-      transition={{ type: "spring", stiffness: 280, damping: 28 }}
+      exit={{
+        opacity: 0,
+        scale: 0.95,
+        transition: { duration: 0.18, ease: EASE_EXIT },
+      }}
+      transition={{
+        duration: ENTRANCE_DURATION,
+        ease: EASE_OUT,
+        delay: (siblingIndex * STAGGER_MS) / 1000,
+        layout: { duration: 0.32, ease: EASE_OUT },
+      }}
       {...compiledMotion}
       {...handlers}
     >
