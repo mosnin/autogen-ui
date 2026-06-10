@@ -87,6 +87,27 @@ export { compileStyle, STATIC_SAFELIST } from "./style";
 export { compileMotion } from "./motion";
 export { ThemeProvider, themeToCssVars, type ThemeProviderProps } from "./theme";
 
+// Brand kits — host-defined identity (color, typography, voice).
+export {
+  brandKitSchema,
+  brandToCssVars,
+  brandToDarkCssVars,
+  brandToPromptSection,
+  type BrandColorTokens,
+  type BrandKit,
+} from "./brand";
+export { BrandProvider, useBrand, type BrandProviderProps } from "./brand-provider";
+export {
+  brandPresets,
+  forestKit,
+  linearKit,
+  monoKit,
+  sharpKit,
+  violetKit,
+  warmKit,
+  type BrandPresetName,
+} from "./brand-presets";
+
 // Phase 3 — runtime component definition
 export { instantiateComponent, listComponentTypes, validateComponentDef } from "./define";
 export {

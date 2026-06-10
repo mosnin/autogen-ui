@@ -52,6 +52,26 @@ export { applyPatch, applyPatches, findNode, validatePatchTargets } from "./patc
 // (CORS bypass + auth header injection).
 export { createDataProxyHandler, type DataProxyOptions } from "./proxy";
 
+// Brand kits — host-defined identity (color, typography, voice).
+export {
+  brandKitSchema,
+  brandToCssVars,
+  brandToDarkCssVars,
+  brandToPromptSection,
+  type BrandColorTokens,
+  type BrandKit,
+} from "./brand";
+export {
+  brandPresets,
+  forestKit,
+  linearKit,
+  monoKit,
+  sharpKit,
+  violetKit,
+  warmKit,
+  type BrandPresetName,
+} from "./brand-presets";
+
 // Agent (standard + streaming) + route handlers
 export {
   buildContextMessage,

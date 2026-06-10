@@ -1,3 +1,4 @@
+import { brandToPromptSection, type BrandKit } from "./brand";
 import type { LLMClient, LLMSystemSegment, LLMTool } from "./llm";
 import { validatePatchTargets } from "./patch";
 import { componentCatalog, type ComponentDoc } from "./registry";
@@ -40,6 +41,11 @@ export interface CreateUIAgentOptions {
   /** Extra product-specific guidance (tone, domain defaults, ...). */
   instructions?: string;
   /**
+   * Host's brand kit — tokens, voice, content rules. Injected into the
+   * system prompt so the agent picks props that match the host's identity.
+   */
+  brand?: BrandKit;
+  /**
    * Bounded auto-repair: when the model's tool input fails Zod validation,
    * feed the error back and retry up to this many times. Default 2.
    */
@@ -81,6 +87,7 @@ function buildBaseSystemPrompt(
   capabilities: CapabilityModule[],
   extraComponents: ComponentDoc[],
   instructions?: string,
+  brand?: BrandKit,
 ): string {
   const base = `You are the UI engine behind autogen-ui. You build and edit a
 live dashboard by emitting patches against a JSON spec tree. You never write
@@ -110,7 +117,8 @@ RULES:
     .join("");
 
   const extra = instructions ? `\n\n## ADDITIONAL INSTRUCTIONS\n${instructions}` : "";
-  return base + capSections + extra;
+  const brandSection = brandToPromptSection(brand);
+  return base + capSections + extra + brandSection;
 }
 
 /**
@@ -121,11 +129,13 @@ export function buildSystemSegments(opts: {
   capabilities?: CapabilityModule[];
   components?: ComponentDoc[];
   instructions?: string;
+  brand?: BrandKit;
 }): LLMSystemSegment[] {
   const text = buildBaseSystemPrompt(
     opts.capabilities ?? [],
     opts.components ?? [],
     opts.instructions,
+    opts.brand,
   );
   return [{ text, cache: true }];
 }
@@ -253,10 +263,11 @@ export function createUIAgent({
   capabilities = [],
   components = [],
   instructions,
+  brand,
   maxRepairAttempts = 2,
   repairOnWarnings = false,
 }: CreateUIAgentOptions): UIAgent {
-  const system = buildSystemSegments({ capabilities, components, instructions });
+  const system = buildSystemSegments({ capabilities, components, instructions, brand });
 
   return {
     async run(request) {
@@ -280,8 +291,9 @@ export function getSystemPrompt(
   capabilities: CapabilityModule[] = [],
   components: ComponentDoc[] = [],
   instructions?: string,
+  brand?: BrandKit,
 ): string {
-  return buildBaseSystemPrompt(capabilities, components, instructions);
+  return buildBaseSystemPrompt(capabilities, components, instructions, brand);
 }
 
 /**

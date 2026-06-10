@@ -1,10 +1,19 @@
 "use client";
 
-import { DashboardRenderer, useRuntime, useStreamingDashboard } from "@autogen-ui/core";
+import {
+  BrandProvider,
+  DashboardRenderer,
+  brandPresets,
+  useRuntime,
+  useStreamingDashboard,
+  type BrandPresetName,
+} from "@autogen-ui/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { seeds } from "@/lib/presets";
 import { useVoice } from "@/lib/voice";
+
+const BRAND_NAMES = Object.keys(brandPresets) as BrandPresetName[];
 
 const EMPTY_PROMPTS = [
   "An empty canvas.",
@@ -30,6 +39,8 @@ export default function Page() {
   const [exportOpen, setExportOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [brandName, setBrandName] = useState<BrandPresetName>("violet");
+  const brand = brandPresets[brandName];
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -83,7 +94,7 @@ export default function Page() {
   };
 
   return (
-    <main className="flex h-screen flex-col bg-background text-foreground">
+    <BrandProvider kit={brand} className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex items-center justify-between border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
         <div className="flex items-center gap-2.5">
           <button
@@ -103,6 +114,24 @@ export default function Page() {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Brand picker — proves the host can swap design language live */}
+          <div className="hidden items-center rounded-md border border-border bg-card p-0.5 sm:flex">
+            {BRAND_NAMES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setBrandName(n)}
+                aria-pressed={brandName === n}
+                title={`Switch to ${n}`}
+                className={`grid h-5 w-5 place-items-center rounded transition-all ${
+                  brandName === n ? "ring-2 ring-ring" : ""
+                }`}
+                style={{
+                  background: `hsl(${brandPresets[n].colors?.primary ?? "0 0% 50%"})`,
+                }}
+              />
+            ))}
+          </div>
           <button
             type="button"
             onClick={() => setExportOpen(true)}
@@ -419,6 +448,6 @@ export default function Page() {
           </>
         )}
       </AnimatePresence>
-    </main>
+    </BrandProvider>
   );
 }

@@ -1549,6 +1549,74 @@ function test(name: string, ok: boolean, detail = "") {
   test("body tokens substituted from args", receivedBody === '{"email":"ada@example.com"}');
 }
 
+// ---------- 29. BrandKit compiles to CSS variables.
+{
+  process.stdout.write("\n# brand kit -> css vars\n");
+  const { brandToCssVars, brandToDarkCssVars, brandToPromptSection } = await import("../src/brand");
+  const kit = {
+    name: "linear",
+    colors: { primary: "232 86% 62%", background: "0 0% 99%" },
+    dark: { primary: "232 90% 70%" },
+    radius: "lg" as const,
+    typography: { sans: "Inter", display: "Manrope" },
+    voice: { tone: "minimal", rules: ["Sentence case headings", "No exclamation marks"] },
+  };
+  const cssVars = brandToCssVars(kit);
+  test("primary maps to --primary", cssVars["--primary"] === "232 86% 62%");
+  test("background maps to --background", cssVars["--background"] === "0 0% 99%");
+  test("radius maps to a length", cssVars["--radius"] === "0.625rem");
+  test("sans typography maps to --font-sans", cssVars["--font-sans"] === "Inter");
+  test("display typography maps to --font-display", cssVars["--font-display"] === "Manrope");
+  test(
+    "dark overrides are separate",
+    brandToDarkCssVars(kit)["--primary"] === "232 90% 70%",
+  );
+
+  // Prompt section
+  const prompt = brandToPromptSection(kit);
+  test("prompt names the brand", /Brand: linear/.test(prompt));
+  test("prompt names the voice", /Voice: minimal/.test(prompt));
+  test("prompt enumerates rules", /Sentence case/.test(prompt) && /exclamation/.test(prompt));
+  test("prompt mentions primary color", /232 86% 62%/.test(prompt));
+
+  // Empty kit returns nothing
+  test("empty kit returns empty prompt", brandToPromptSection(undefined) === "");
+  test("empty kit returns empty css", Object.keys(brandToCssVars(undefined)).length === 0);
+}
+
+// ---------- 30. Agent surfaces brand voice + rules in the system prompt.
+{
+  process.stdout.write("\n# agent brand injection\n");
+  let seenSystem = "";
+  const fake = createFakeClient([
+    (req) => {
+      const segs = Array.isArray(req.system) ? req.system : [{ text: req.system }];
+      seenSystem = segs.map((s) => s.text).join("\n");
+      return { message: "ok", patches: [] };
+    },
+  ]);
+  const { linearKit } = await import("../src/brand-presets");
+  const agent = createUIAgent({ client: fake, brand: linearKit });
+  await agent.run({ messages: [{ role: "user", content: "x" }] });
+  test("system prompt contains BRAND section", /## BRAND/.test(seenSystem));
+  test("brand name appears", /Brand: linear/.test(seenSystem));
+  test("voice rule appears", /Sentence case/.test(seenSystem));
+}
+
+// ---------- 31. Brand presets are sensible and validate.
+{
+  process.stdout.write("\n# brand presets\n");
+  const { brandKitSchema } = await import("../src/brand");
+  const { brandPresets } = await import("../src/brand-presets");
+  const presetNames = Object.keys(brandPresets);
+  test("at least 6 presets shipped", presetNames.length >= 6);
+  for (const name of presetNames) {
+    const kit = brandPresets[name as keyof typeof brandPresets];
+    const parsed = brandKitSchema.safeParse(kit);
+    test(`${name} preset validates`, parsed.success);
+  }
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

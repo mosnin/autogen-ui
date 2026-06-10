@@ -21,11 +21,14 @@ export interface StreamingUIAgent {
   runStream(request: AgentRequest): AsyncIterable<StreamFrame>;
 }
 
+import type { BrandKit } from "./brand";
+
 export interface CreateStreamingUIAgentOptions {
   client: LLMClient;
   capabilities?: CapabilityModule[];
   components?: ComponentDoc[];
   instructions?: string;
+  brand?: BrandKit;
 }
 
 /**
@@ -42,8 +45,9 @@ export function createStreamingUIAgent({
   capabilities = [],
   components = [],
   instructions,
+  brand,
 }: CreateStreamingUIAgentOptions): StreamingUIAgent {
-  const system = buildSystemSegments({ capabilities, components, instructions });
+  const system = buildSystemSegments({ capabilities, components, instructions, brand });
 
   return {
     async *runStream(request: AgentRequest): AsyncIterable<StreamFrame> {
