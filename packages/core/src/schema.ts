@@ -337,6 +337,12 @@ export const dashboardSchema = z.object({
    * falls back to `root`. Use the `navigate` action to switch screens.
    */
   screens: z.record(uiNodeSchema).optional(),
+  /**
+   * Optional persistent wrapper tree rendered around every screen. Place
+   * an `{ type: "Outlet" }` node where the screen content should appear.
+   * Use this for sidebars/top-nav/branded chrome that survive navigation.
+   */
+  layout: uiNodeSchema.optional(),
 });
 export type Dashboard = z.infer<typeof dashboardSchema>;
 
@@ -446,7 +452,43 @@ export function emptyDashboard(id = "dashboard"): Dashboard {
     functions: {},
     state: {},
     screens: undefined,
+    layout: undefined,
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Spec migrations — walk older specs forward to the current SPEC_VERSION.
+ * ------------------------------------------------------------------ */
+
+type AnyDashboard = Record<string, unknown> & { version?: number };
+
+/** Per-version migrators (key = source version). */
+const MIGRATIONS: Record<number, (v: AnyDashboard) => AnyDashboard> = {
+  // v1 → v2: schema gained `screens`, `layout`, `functions`, `theme`.
+  1: (v) => ({
+    ...v,
+    version: 2,
+    screens: undefined,
+    layout: undefined,
+    functions: {},
+    theme: undefined,
+  }),
+};
+
+/**
+ * Migrate any prior-version dashboard JSON to the current `SPEC_VERSION`
+ * and parse it. Throws if the input isn't recoverable. Versionless input is
+ * treated as v1.
+ */
+export function migrateDashboard(value: unknown): Dashboard {
+  let current = (value && typeof value === "object" ? value : {}) as AnyDashboard;
+  if (typeof current.version !== "number") current = { ...current, version: 1 };
+  while (typeof current.version === "number" && current.version < SPEC_VERSION) {
+    const fn = MIGRATIONS[current.version];
+    if (!fn) break;
+    current = fn(current);
+  }
+  return dashboardSchema.parse(current);
 }
 
 /** Parse + migrate an unknown value into a current-version Dashboard. */

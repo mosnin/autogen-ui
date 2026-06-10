@@ -226,6 +226,8 @@ export const builtinPropSchemas: ComponentPropSchemas = {
 
   Spacer: z.object({}).passthrough(),
 
+  Outlet: z.object({}).passthrough(),
+
   ForEach: z
     .object({
       source: z.string(),

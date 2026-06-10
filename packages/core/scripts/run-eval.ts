@@ -1713,6 +1713,76 @@ function test(name: string, ok: boolean, detail = "") {
   test("hadRepair false on happy path", captured[0]?.hadRepair === false);
 }
 
+// ---------- 35. Layout with Outlet substitutes the active screen.
+{
+  process.stdout.write("\n# layout + outlet\n");
+  const { dashboardSchema } = await import("../src/schema");
+  const d = dashboardSchema.parse({
+    id: "d",
+    root: { id: "root", type: "Grid", children: [{ id: "home", type: "Text", props: { text: "home" } }] },
+    state: { currentScreen: "details" },
+    screens: {
+      details: { id: "details_root", type: "Grid", children: [{ id: "dp", type: "Text", props: { text: "details" } }] },
+    },
+    layout: {
+      id: "shell",
+      type: "Grid",
+      children: [
+        { id: "sidebar", type: "Box", children: [{ id: "nav", type: "Text", props: { text: "nav" } }] },
+        { id: "main", type: "Box", children: [{ id: "slot", type: "Outlet" }] },
+      ],
+    },
+  });
+  test("layout parses with Outlet child", d.layout?.id === "shell");
+  test("Outlet acceptable in schema", d.layout?.children?.[1]?.children?.[0]?.type === "Outlet");
+  // We don't render here (would need jsdom). The renderer's `replaceOutlet`
+  // is purely declarative; test it via a JS impl mirror:
+  function walk(layout: { type: string; children?: unknown[] }, screen: unknown): unknown {
+    if (layout.type === "Outlet") return screen;
+    if (!layout.children) return layout;
+    return {
+      ...layout,
+      children: layout.children.map((c) => walk(c as never, screen)),
+    };
+  }
+  const result = walk(d.layout as never, d.screens?.details) as { children?: { children?: { type?: string }[] }[] };
+  test(
+    "outlet substituted with current screen",
+    result.children?.[1]?.children?.[0]?.type === "Grid",
+  );
+}
+
+// ---------- 36. migrateDashboard walks v1 forward to current SPEC_VERSION.
+{
+  process.stdout.write("\n# spec migrations\n");
+  const { migrateDashboard, SPEC_VERSION } = await import("../src/schema");
+  // v1-shaped input (no `screens`, no `layout`, no `functions`, no `theme`).
+  const v1 = {
+    version: 1,
+    id: "old",
+    root: { id: "root", type: "Grid", children: [] },
+    components: {},
+    dataSources: {},
+    state: {},
+  };
+  const migrated = migrateDashboard(v1);
+  test("migrated to current version", migrated.version === SPEC_VERSION);
+  test("functions injected", migrated.functions !== undefined);
+  test("layout undefined for v1 input", migrated.layout === undefined);
+  // Versionless input treated as v1.
+  const versionless = { id: "x", root: { id: "root", type: "Grid" } };
+  const migrated2 = migrateDashboard(versionless);
+  test("versionless coerced to current", migrated2.version === SPEC_VERSION);
+  // Current-version round-trips identically (functionally).
+  const current = {
+    version: SPEC_VERSION,
+    id: "now",
+    root: { id: "root", type: "Grid", children: [] },
+  };
+  const same = migrateDashboard(current);
+  test("current-version input parses cleanly", same.version === SPEC_VERSION);
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

@@ -119,3 +119,10 @@ export const Icon: RegistryComponent = ({ name, size }) => {
 
 /** Flexible spacer that absorbs free space inside a flex container. */
 export const Spacer: RegistryComponent = () => <div className="flex-1" aria-hidden="true" />;
+
+/**
+ * Placeholder marker for the active screen's content. The renderer
+ * substitutes this node with the screen tree when `dashboard.layout` is
+ * set, so this fallback renders nothing.
+ */
+export const Outlet: RegistryComponent = () => null;

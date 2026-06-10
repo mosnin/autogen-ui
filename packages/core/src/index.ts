@@ -18,6 +18,7 @@ export {
   dataSourceSchema,
   emptyDashboard,
   eventMapSchema,
+  migrateDashboard,
   jsonValueSchema,
   motionSpecSchema,
   parseDashboard,

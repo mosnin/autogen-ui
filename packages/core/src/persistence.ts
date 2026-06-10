@@ -1,4 +1,4 @@
-import { parseDashboard, SPEC_VERSION, type Dashboard } from "./schema";
+import { migrateDashboard, parseDashboard, SPEC_VERSION, type Dashboard } from "./schema";
 
 /**
  * Persistence helpers: serialize dashboards to JSON, restore them through the
@@ -22,16 +22,14 @@ export function serializeDashboard(d: Dashboard): string {
  */
 export function deserializeDashboard(json: string): Dashboard {
   const raw = JSON.parse(json) as unknown;
-  let value = raw;
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    const obj = raw as Record<string, unknown>;
-    const version = obj.version;
-    if (typeof version !== "number" || version < SPEC_VERSION) {
-      value = { ...obj, version: SPEC_VERSION };
-    }
-  }
-  return parseDashboard(value);
+  // migrateDashboard walks any prior version forward; current-version JSON
+  // round-trips identically.
+  return migrateDashboard(raw);
 }
+
+// Keep SPEC_VERSION import live for consumers re-exporting from persistence.
+void SPEC_VERSION;
+void parseDashboard;
 
 /** Persist a dashboard to `localStorage`. No-op outside the browser. */
 export function saveDashboard(key: string, d: Dashboard): void {

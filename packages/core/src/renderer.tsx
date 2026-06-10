@@ -68,7 +68,21 @@ const DEFAULT_SPAN: Record<string, number> = {
   Quote: 12,
   Kbd: 2,
   ForEach: 12,
+  Outlet: 12,
 };
+
+/** Substitute the first `Outlet` node in `layout` with `screen`. */
+function replaceOutlet(layout: UINode, screen: UINode): UINode {
+  if (layout.type === "Outlet") return screen;
+  if (!layout.children || layout.children.length === 0) return layout;
+  let changed = false;
+  const nextChildren = layout.children.map((child) => {
+    const replaced = replaceOutlet(child, screen);
+    if (replaced !== child) changed = true;
+    return replaced;
+  });
+  return changed ? { ...layout, children: nextChildren } : layout;
+}
 
 /** The grid-span wrapper class is structural and owned by the renderer. */
 function spanClass(node: UINode): string {
@@ -254,13 +268,19 @@ export function DashboardRenderer({
   );
 
   // Routing: pick a screen if state.currentScreen names one, else the root.
+  // Then, if a persistent `layout` is set, substitute the Outlet for the
+  // chosen screen so navigation doesn't tear down the chrome.
   const activeRoot: UINode = useMemo(() => {
     const screenKey = ctx.state?.currentScreen;
-    if (typeof screenKey === "string" && dashboard.screens?.[screenKey]) {
-      return dashboard.screens[screenKey]!;
+    const screen =
+      typeof screenKey === "string" && dashboard.screens?.[screenKey]
+        ? dashboard.screens[screenKey]!
+        : dashboard.root;
+    if (dashboard.layout) {
+      return replaceOutlet(dashboard.layout, screen);
     }
-    return dashboard.root;
-  }, [ctx.state?.currentScreen, dashboard.root, dashboard.screens]);
+    return screen;
+  }, [ctx.state?.currentScreen, dashboard.root, dashboard.screens, dashboard.layout]);
 
   return (
     <RuntimeReactContext.Provider value={ctx}>

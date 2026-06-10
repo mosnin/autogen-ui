@@ -1,4 +1,4 @@
-import { Box, Icon, Image, Spacer } from "./components/box";
+import { Box, Icon, Image, Outlet, Spacer } from "./components/box";
 import { Checkbox, Form, Input, Select, Switch, Textarea } from "./components/forms";
 import { Avatar, CodeBlock, Kbd, Quote, Skeleton } from "./components/media";
 import { Accordion, Breadcrumb, Link, Tabs } from "./components/navigation";
@@ -148,6 +148,13 @@ export const componentCatalog: ComponentDoc[] = [
     acceptsChildren: false,
   },
   {
+    type: "Outlet",
+    description:
+      "Placeholder for the active screen inside `dashboard.layout`. Put one Outlet anywhere in the layout tree (e.g. next to a Sidebar). The renderer swaps it for the current screen's root on every navigation.",
+    props: "(none)",
+    acceptsChildren: false,
+  },
+  {
     type: "ForEach",
     description:
       "Repeats its first child once per item in `source`. Inside the template, bindings can reference `{{<as>.X}}` (default `as` is \"item\") and the loop index via `{{<indexAs>}}` (default \"i\"). Events on the template are rewritten with concrete per-iteration values at expansion time.",
@@ -285,6 +292,7 @@ export const defaultRegistry: ComponentRegistry = {
   Image,
   Icon,
   Spacer,
+  Outlet,
   // ForEach resolves to Box before render; reuse Box as the renderer.
   ForEach: Box,
   Input,
