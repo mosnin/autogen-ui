@@ -1,7 +1,7 @@
 "use client";
 
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { EASE_OUT } from "../_easing";
 import { useRuntimeContext } from "../runtime-context";
 import { cn } from "../utils";
@@ -443,6 +443,9 @@ function ChartBody({
   const innerW = W - PAD * 2;
   const innerH = H - PAD * 2;
 
+  const [hovered, setHovered] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
   // Dotted reference grid — 3 horizontal lines for a sense of scale.
   const grid = [0.33, 0.66, 1].map((f) => PAD + innerH - innerH * f);
   const gridLines = (
@@ -462,48 +465,96 @@ function ChartBody({
     </g>
   );
 
+  const onMove = (evt: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const x = ((evt.clientX - rect.left) / rect.width) * W;
+    const step = kind === "bar" ? innerW / points.length : innerW / Math.max(points.length - 1, 1);
+    if (step <= 0) return;
+    const i =
+      kind === "bar"
+        ? Math.floor((x - PAD) / step)
+        : Math.round((x - PAD) / step);
+    if (i >= 0 && i < points.length) setHovered(i);
+  };
+
+  const tooltip = (() => {
+    if (hovered === null) return null;
+    const p = points[hovered];
+    if (!p) return null;
+    const isBar = kind === "bar";
+    const step = isBar ? innerW / points.length : innerW / Math.max(points.length - 1, 1);
+    const cx = isBar ? PAD + step * hovered + step / 2 : PAD + step * hovered;
+    const xPct = (cx / W) * 100;
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-[11px] shadow-rest"
+        style={{ left: `${xPct}%`, top: `${(PAD / (H + 20)) * 100}%` }}
+      >
+        <span className="font-medium">{p.label}</span>
+        <span className="ml-2 font-tabular text-muted-foreground">
+          {p.value.toLocaleString()}
+        </span>
+      </div>
+    );
+  })();
+
   if (kind === "bar") {
     const bw = innerW / points.length;
     return (
-      <svg
-        viewBox={`0 0 ${W} ${H + 20}`}
-        className="w-full h-auto"
-        role="img"
-        aria-label={ariaLabel}
-      >
-        <title>{ariaLabel}</title>
-        <defs>
-          <linearGradient id="bar-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="1" />
-            <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0.7" />
-          </linearGradient>
-        </defs>
-        {gridLines}
-        {points.map((p, i) => {
-          const h = (p.value / max) * innerH;
-          return (
-            <g key={i}>
-              <motion.rect
-                x={PAD + i * bw + bw * 0.18}
-                width={bw * 0.64}
-                rx={3}
-                fill="url(#bar-grad)"
-                initial={{ height: 0, y: PAD + innerH }}
-                animate={{ height: h, y: PAD + innerH - h }}
-                transition={{ duration: 0.5, ease: EASE_OUT, delay: i * 0.04 }}
-              />
-              <text
-                x={PAD + i * bw + bw / 2}
-                y={H + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground text-[10px] font-tabular"
-              >
-                {p.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+      <div className="relative">
+        {tooltip}
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H + 20}`}
+          className="w-full h-auto"
+          role="img"
+          aria-label={ariaLabel}
+          onMouseMove={onMove}
+          onMouseLeave={() => setHovered(null)}
+        >
+          <title>{ariaLabel}</title>
+          <defs>
+            <linearGradient id="bar-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="1" />
+              <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0.7" />
+            </linearGradient>
+          </defs>
+          {gridLines}
+          {points.map((p, i) => {
+            const h = (p.value / max) * innerH;
+            const isHover = hovered === i;
+            return (
+              <g key={i}>
+                <motion.rect
+                  x={PAD + i * bw + bw * 0.18}
+                  width={bw * 0.64}
+                  rx={3}
+                  fill="url(#bar-grad)"
+                  opacity={hovered === null || isHover ? 1 : 0.55}
+                  initial={{ height: 0, y: PAD + innerH }}
+                  animate={{ height: h, y: PAD + innerH - h }}
+                  transition={{ duration: 0.5, ease: EASE_OUT, delay: i * 0.04 }}
+                />
+                <text
+                  x={PAD + i * bw + bw / 2}
+                  y={H + 14}
+                  textAnchor="middle"
+                  className={cn(
+                    "text-[10px] font-tabular",
+                    isHover ? "fill-foreground" : "fill-muted-foreground",
+                  )}
+                >
+                  {p.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     );
   }
 
@@ -515,62 +566,83 @@ function ChartBody({
   const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
   const areaPath = `${linePath} L${PAD + innerW},${PAD + innerH} L${PAD},${PAD + innerH} Z`;
 
+  const hoveredCoord = hovered !== null ? coords[hovered] : null;
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H + 20}`}
-      className="w-full h-auto"
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <title>{ariaLabel}</title>
-      <defs>
-        <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {gridLines}
-      {kind === "area" && (
-        <motion.path
-          d={areaPath}
-          fill="url(#area-grad)"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.1 }}
-        />
-      )}
-      <motion.path
-        d={linePath}
-        fill="none"
-        strokeWidth={2}
-        className="stroke-chart-1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 0.7, ease: EASE_OUT }}
-      />
-      {coords.map((c, i) => (
-        <g key={i}>
-          <motion.circle
-            cx={c.x}
-            cy={c.y}
-            r={3}
-            className="fill-chart-1"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.3, ease: EASE_OUT, delay: 0.5 + i * 0.04 }}
+    <div className="relative">
+      {tooltip}
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H + 20}`}
+        className="w-full h-auto"
+        role="img"
+        aria-label={ariaLabel}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <title>{ariaLabel}</title>
+        <defs>
+          <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {gridLines}
+        {hoveredCoord && (
+          <line
+            x1={hoveredCoord.x}
+            x2={hoveredCoord.x}
+            y1={PAD}
+            y2={PAD + innerH}
+            className="stroke-foreground/30"
+            strokeWidth={1}
+            strokeDasharray="2 3"
           />
-          <text
-            x={c.x}
-            y={H + 14}
-            textAnchor="middle"
-            className="fill-muted-foreground text-[10px]"
-          >
-            {points[i]?.label}
-          </text>
-        </g>
-      ))}
-    </svg>
+        )}
+        {kind === "area" && (
+          <motion.path
+            d={areaPath}
+            fill="url(#area-grad)"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, ease: EASE_OUT, delay: 0.1 }}
+          />
+        )}
+        <motion.path
+          d={linePath}
+          fill="none"
+          strokeWidth={2}
+          className="stroke-chart-1"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 0.7, ease: EASE_OUT }}
+        />
+        {coords.map((c, i) => (
+          <g key={i}>
+            <motion.circle
+              cx={c.x}
+              cy={c.y}
+              r={hovered === i ? 5 : 3}
+              className="fill-chart-1"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.3, ease: EASE_OUT, delay: 0.5 + i * 0.04 }}
+            />
+            <text
+              x={c.x}
+              y={H + 14}
+              textAnchor="middle"
+              className={cn(
+                "text-[10px] font-tabular",
+                hovered === i ? "fill-foreground" : "fill-muted-foreground",
+              )}
+            >
+              {points[i]?.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
   );
 }

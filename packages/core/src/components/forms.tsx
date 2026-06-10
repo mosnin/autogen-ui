@@ -19,12 +19,83 @@ function getActions(events: EventMap | undefined, name: string): Action[] {
   return Array.isArray(list) ? list : [];
 }
 
-function inputCls(extra?: string): string {
+function inputCls(extra?: string, invalid = false): string {
   return cn(
-    "w-full rounded-md border border-border bg-background px-3 py-2 text-sm",
+    "w-full rounded-md border bg-background px-3 py-2 text-sm",
     "outline-none transition-colors placeholder:text-muted-foreground",
-    "focus:ring-2 focus:ring-ring focus:ring-offset-0",
+    invalid
+      ? "border-danger/60 focus:ring-2 focus:ring-danger/40"
+      : "border-border focus:ring-2 focus:ring-ring focus:ring-offset-0",
     extra,
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Validation
+ * ------------------------------------------------------------------ */
+
+interface ValidateRules {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+  type?: "email" | "url";
+  message?: string;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_RE = /^https?:\/\/\S+$/;
+
+export function validateInput(value: unknown, rulesRaw: unknown): string | null {
+  if (!rulesRaw || typeof rulesRaw !== "object") return null;
+  const rules = rulesRaw as ValidateRules;
+  const isEmpty = value === undefined || value === null || value === "";
+
+  if (rules.required && isEmpty) return rules.message ?? "Required";
+  if (isEmpty) return null;
+
+  const s = typeof value === "string" ? value : String(value);
+  if (typeof rules.minLength === "number" && s.length < rules.minLength) {
+    return rules.message ?? `Must be at least ${rules.minLength} characters`;
+  }
+  if (typeof rules.maxLength === "number" && s.length > rules.maxLength) {
+    return rules.message ?? `Must be at most ${rules.maxLength} characters`;
+  }
+  if (rules.type === "email" && !EMAIL_RE.test(s)) {
+    return rules.message ?? "Must be a valid email";
+  }
+  if (rules.type === "url" && !URL_RE.test(s)) {
+    return rules.message ?? "Must be a valid URL";
+  }
+  if (typeof rules.pattern === "string") {
+    try {
+      if (!new RegExp(rules.pattern).test(s)) {
+        return rules.message ?? "Invalid format";
+      }
+    } catch {
+      // bad pattern — skip
+    }
+  }
+
+  if (typeof value === "number") {
+    if (typeof rules.min === "number" && value < rules.min) {
+      return rules.message ?? `Must be at least ${rules.min}`;
+    }
+    if (typeof rules.max === "number" && value > rules.max) {
+      return rules.message ?? `Must be at most ${rules.max}`;
+    }
+  }
+  return null;
+}
+
+function ErrorText({ error, id }: { error: string | null; id: string }) {
+  if (!error) return null;
+  return (
+    <span id={id} role="alert" className="text-[11px] font-medium text-danger">
+      {error}
+    </span>
   );
 }
 
@@ -40,20 +111,27 @@ export const Input: RegistryComponent = ({ node, type, placeholder, value, id, n
   const onChange = getActions(node?.events, "onChange");
   const idStr = str(id);
   const nameStr = str(name);
+  const error = validateInput(value, (node?.props as { validate?: unknown } | undefined)?.validate);
+  const errorId = `${node?.id ?? "input"}__err`;
 
   return (
-    <input
-      type={t}
-      {...(idStr ? { id: idStr } : {})}
-      {...(nameStr ? { name: nameStr } : {})}
-      placeholder={str(placeholder)}
-      value={value === null || value === undefined ? "" : String(value)}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => {
-        const v = t === "number" ? Number(e.target.value) : e.target.value;
-        if (onChange.length > 0) dispatch(onChange, { value: v, name: e.target.name });
-      }}
-      className={inputCls()}
-    />
+    <div className="flex flex-col gap-1">
+      <input
+        type={t}
+        {...(idStr ? { id: idStr } : {})}
+        {...(nameStr ? { name: nameStr } : {})}
+        placeholder={str(placeholder)}
+        value={value === null || value === undefined ? "" : String(value)}
+        aria-invalid={error ? true : undefined}
+        aria-errormessage={error ? errorId : undefined}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          const v = t === "number" ? Number(e.target.value) : e.target.value;
+          if (onChange.length > 0) dispatch(onChange, { value: v, name: e.target.name });
+        }}
+        className={inputCls(undefined, Boolean(error))}
+      />
+      <ErrorText error={error} id={errorId} />
+    </div>
   );
 };
 
@@ -66,18 +144,25 @@ export const Textarea: RegistryComponent = ({ node, placeholder, value, rows, id
   const onChange = getActions(node?.events, "onChange");
   const idStr = str(id);
   const nameStr = str(name);
+  const error = validateInput(value, (node?.props as { validate?: unknown } | undefined)?.validate);
+  const errorId = `${node?.id ?? "textarea"}__err`;
   return (
-    <textarea
-      rows={num(rows, 3)}
-      {...(idStr ? { id: idStr } : {})}
-      {...(nameStr ? { name: nameStr } : {})}
-      placeholder={str(placeholder)}
-      value={value === null || value === undefined ? "" : String(value)}
-      onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
-        if (onChange.length > 0) dispatch(onChange, { value: e.target.value });
-      }}
-      className={inputCls("resize-y")}
-    />
+    <div className="flex flex-col gap-1">
+      <textarea
+        rows={num(rows, 3)}
+        {...(idStr ? { id: idStr } : {})}
+        {...(nameStr ? { name: nameStr } : {})}
+        placeholder={str(placeholder)}
+        value={value === null || value === undefined ? "" : String(value)}
+        aria-invalid={error ? true : undefined}
+        aria-errormessage={error ? errorId : undefined}
+        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => {
+          if (onChange.length > 0) dispatch(onChange, { value: e.target.value });
+        }}
+        className={inputCls("resize-y", Boolean(error))}
+      />
+      <ErrorText error={error} id={errorId} />
+    </div>
   );
 };
 

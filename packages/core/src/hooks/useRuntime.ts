@@ -26,6 +26,8 @@ export interface UseRuntimeResult {
   state: Record<string, unknown>;
   /** Per-source loading flags from `useDataSources`. */
   loading: Record<string, boolean>;
+  /** Per-source error messages (null/undefined when ok). */
+  errors: Record<string, string | null>;
   dispatch: (actions: Action[], eventPayload?: Record<string, unknown>) => void;
 }
 
@@ -51,7 +53,7 @@ export function useRuntime(
   opts: UseRuntimeOptions = {},
 ): UseRuntimeResult {
   const { fetcher, onState } = opts;
-  const { data, loading, refetch } = useDataSources(dashboard, { fetcher });
+  const { data, loading, errors, refetch } = useDataSources(dashboard, { fetcher });
 
   const [state, setStateMap] = useState<Record<string, unknown>>(
     () => ({ ...(dashboard.state ?? {}) }),
@@ -88,5 +90,5 @@ export function useRuntime(
     [setState, refetch],
   );
 
-  return { data, state, loading, dispatch };
+  return { data, state, loading, errors, dispatch };
 }

@@ -220,6 +220,9 @@ function resolveValue(path: string, ctx: RuntimeContext): unknown {
   if (path.startsWith("loading.")) {
     return getPath(ctx.loading, path.slice("loading.".length));
   }
+  if (path.startsWith("errors.")) {
+    return getPath(ctx.errors, path.slice("errors.".length));
+  }
   // Scope (ForEach `item` / `as` variables) takes precedence over data so the
   // template's references resolve to the current iteration's value first.
   if (ctx.scope && Object.keys(ctx.scope).length > 0) {
@@ -367,6 +370,7 @@ export async function fetchDataSource(
 export interface UseDataSourcesResult {
   data: Record<string, unknown>;
   loading: Record<string, boolean>;
+  errors: Record<string, string | null>;
   refetch: (id: string) => void;
 }
 
@@ -391,13 +395,19 @@ export function useDataSources(
 
   const [data, setData] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
   const load = useCallback(
     (id: string, source: DataSource) => {
       setLoading((prev) => ({ ...prev, [id]: true }));
+      setErrors((prev) => ({ ...prev, [id]: null }));
       fetchDataSource(source, { fetcher, proxyUrl })
         .then((value) => setData((prev) => ({ ...prev, [id]: value })))
-        .catch(() => setData((prev) => ({ ...prev, [id]: null })))
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : "Fetch failed";
+          setData((prev) => ({ ...prev, [id]: null }));
+          setErrors((prev) => ({ ...prev, [id]: message }));
+        })
         .finally(() => setLoading((prev) => ({ ...prev, [id]: false })));
     },
     [fetcher, proxyUrl],
@@ -434,7 +444,10 @@ export function useDataSources(
             }
             setData((prev) => ({ ...prev, [id]: selectPath(parsed, source.select) }));
           };
-          ws.onerror = () => setLoading((prev) => ({ ...prev, [id]: false }));
+          ws.onerror = () => {
+            setLoading((prev) => ({ ...prev, [id]: false }));
+            setErrors((prev) => ({ ...prev, [id]: "WebSocket error" }));
+          };
           ws.onclose = () => setLoading((prev) => ({ ...prev, [id]: false }));
           sockets.push(ws);
         } catch {
@@ -468,5 +481,5 @@ export function useDataSources(
     [dashboard.dataSources, load],
   );
 
-  return { data, loading, refetch };
+  return { data, loading, errors, refetch };
 }

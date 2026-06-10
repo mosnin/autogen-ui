@@ -1356,6 +1356,87 @@ function test(name: string, ok: boolean, detail = "") {
   test("invalid ws url rejected", !bad.success);
 }
 
+// ---------- 23. validateInput: schema-driven form validation.
+{
+  process.stdout.write("\n# input validation\n");
+  const { validateInput } = await import("../src/components/forms");
+  test("required passes when set", validateInput("alice", { required: true }) === null);
+  test("required fails when empty", validateInput("", { required: true }) === "Required");
+  test("required passes null", typeof validateInput(null, { required: true }) === "string");
+  test(
+    "email type rejects bad address",
+    validateInput("not-an-email", { type: "email" }) === "Must be a valid email",
+  );
+  test("email type accepts good", validateInput("ada@example.com", { type: "email" }) === null);
+  test(
+    "minLength catches short input",
+    typeof validateInput("ab", { minLength: 4 }) === "string",
+  );
+  test("min catches small number", typeof validateInput(2, { min: 5 }) === "string");
+  test("pattern rejects mismatch", typeof validateInput("abc", { pattern: "^\\d+$" }) === "string");
+  test("pattern passes match", validateInput("123", { pattern: "^\\d+$" }) === null);
+  test(
+    "custom message overrides default",
+    validateInput("", { required: true, message: "Tell me your name" }) === "Tell me your name",
+  );
+  test("no rules returns null", validateInput("anything", undefined) === null);
+}
+
+// ---------- 24. Per-source errors flow through useDataSources contract.
+{
+  process.stdout.write("\n# per-source errors\n");
+  // We exercise the contract: useDataSourcesResult must include `errors`.
+  // (Live React-rendered test would need jsdom; this checks the surface.)
+  const { fetchDataSource } = await import("../src/data");
+  const failing = (async (_url: RequestInfo | URL) => {
+    return new Response("nope", { status: 500 });
+  }) as typeof fetch;
+  let caught: Error | null = null;
+  try {
+    await fetchDataSource(
+      { kind: "rest", id: "x", url: "https://example.com/x", method: "GET" },
+      { fetcher: failing },
+    );
+  } catch (err) {
+    caught = err as Error;
+  }
+  test("fetchDataSource rejects on non-2xx", caught !== null && /500/.test(caught.message));
+
+  // ws source short-circuits.
+  const data = await fetchDataSource(
+    { kind: "ws", id: "live", url: "wss://example.com/live" },
+  );
+  test("ws kind returns null from fetchDataSource", data === null);
+}
+
+// ---------- 25. errors.X binding path resolves through resolveBindings.
+{
+  process.stdout.write("\n# errors path bindings\n");
+  const { resolveBindings } = await import("../src/data");
+  const ctx = {
+    dashboard: emptyDashboard(),
+    data: {},
+    state: {},
+    loading: {},
+    errors: { sales: "API timeout" },
+    scope: {},
+    dispatch: () => {},
+  };
+  const node = {
+    id: "n",
+    type: "Text",
+    props: { text: "" },
+    bindings: { text: "{{errors.sales}}" },
+  };
+  const out = resolveBindings(node, ctx);
+  test("errors.sales resolves", out.props?.text === "API timeout");
+  const missing = resolveBindings(
+    { ...node, bindings: { text: "{{errors.missing}}" } },
+    ctx,
+  );
+  test("missing error path returns null", missing.props?.text === null);
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

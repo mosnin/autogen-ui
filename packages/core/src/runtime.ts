@@ -16,6 +16,8 @@ export interface RuntimeContext {
   state: Record<string, unknown>;
   /** Per-source loading flags (`loading.id` in bindings + `when`). */
   loading: Record<string, boolean>;
+  /** Per-source error messages (`errors.id` in bindings + `when`). null/undefined when ok. */
+  errors: Record<string, string | null>;
   /**
    * Per-node iteration scope. ForEach expansion writes `{ <as>: item, [<as>+"Index"]: i }`
    * into a fresh scope; the binding resolver checks here before `data`/`state`.

@@ -206,8 +206,10 @@ export interface DashboardRendererProps {
    * omitted, `extensions` is layered over `defaultExtensions`.
    */
   baseExtensions?: RendererExtensions;
-  /** Resolved data, live state, dispatch, and per-source loading flags. */
-  context?: Partial<Pick<RuntimeContext, "data" | "dispatch" | "state" | "loading">>;
+  /** Resolved data, live state, dispatch, per-source loading + error flags. */
+  context?: Partial<
+    Pick<RuntimeContext, "data" | "dispatch" | "state" | "loading" | "errors">
+  >;
   className?: string;
 }
 
@@ -244,6 +246,7 @@ export function DashboardRenderer({
       data: stableCtxIn?.data ?? {},
       state: stableCtxIn?.state ?? dashboard.state ?? {},
       loading: stableCtxIn?.loading ?? {},
+      errors: stableCtxIn?.errors ?? {},
       scope: {},
       dispatch: stableCtxIn?.dispatch ?? (() => {}),
     }),
