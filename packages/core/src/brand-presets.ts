@@ -6,22 +6,38 @@ import type { BrandKit } from "./brand";
  * `hsl(var(--token))` resolver in the preset.
  */
 
-/** Default — confident violet-indigo, the framework's signature kit. */
+/** Default — deep, restrained indigo. The framework's signature kit. */
 export const violetKit: BrandKit = {
   name: "violet",
-  description: "Confident, technical, modern. The framework's default.",
+  description:
+    "Confident indigo, warm-tinted neutrals, deliberate negative space. Editorial.",
   colors: {
-    primary: "255 85% 60%",
+    primary: "248 65% 50%",
     primaryForeground: "0 0% 100%",
-    primarySoft: "255 80% 96%",
-    chart1: "255 85% 60%",
-    chart2: "175 70% 42%",
-    chart3: "30 92% 56%",
-    chart4: "320 70% 60%",
-    chart5: "200 80% 55%",
+    primarySoft: "248 80% 96%",
+    background: "30 25% 99%",
+    foreground: "240 12% 8%",
+    muted: "30 18% 96%",
+    mutedForeground: "240 8% 42%",
+    border: "240 6% 90%",
+    chart1: "248 65% 50%",
+    chart2: "175 70% 38%",
+    chart3: "30 92% 55%",
+    chart4: "320 70% 55%",
+    chart5: "200 80% 50%",
+  },
+  dark: {
+    background: "240 12% 4%",
+    foreground: "30 10% 96%",
+    primary: "248 85% 68%",
+    primarySoft: "248 50% 14%",
+    card: "240 12% 6.5%",
+    muted: "240 10% 12%",
+    border: "240 8% 14%",
   },
   radius: "lg",
-  voice: { tone: "technical, confident" },
+  typography: { sans: "Geist", display: "Geist" },
+  voice: { tone: "restrained, editorial, confident in silence" },
 };
 
 /** Indigo-blue, Linear-style — minimal, restrained. */

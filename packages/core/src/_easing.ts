@@ -4,8 +4,12 @@
  * pass straight to Framer Motion's `transition.ease`.
  */
 
-/** Soft expo-out — entries settle without bouncing. Linear/Framer staple. */
-export const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
+/**
+ * Restrained, Apple-flavored easing. Single curve for almost everything —
+ * `EASE_OUT` settles slowly and decisively. Longer durations + tighter
+ * sibling stagger so entrances feel deliberate and unhurried.
+ */
+export const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 /** Fast, decisive exit. */
 export const EASE_EXIT: [number, number, number, number] = [0.7, 0, 0.84, 0];
@@ -13,8 +17,8 @@ export const EASE_EXIT: [number, number, number, number] = [0.7, 0, 0.84, 0];
 /** Swift snap for taps + small reveals. */
 export const EASE_SWIFT: [number, number, number, number] = [0.32, 0.72, 0, 1];
 
-/** Frame staggering: 36ms between sibling children feels alive, not slow. */
-export const STAGGER_MS = 36;
+/** Sibling stagger — tight enough to read as one composed gesture. */
+export const STAGGER_MS = 28;
 
-/** Total duration ceiling for entrance animations. */
-export const ENTRANCE_DURATION = 0.55;
+/** Default entrance duration — long enough to feel intentional. */
+export const ENTRANCE_DURATION = 0.7;
