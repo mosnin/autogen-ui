@@ -4,6 +4,130 @@ All notable changes to `@autogen-ui/core` are tracked here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-10
+
+The "embeddable framework" release. Host applications can adopt their own
+identity, components, and styling. The framework now expresses full app
+shells (sidebars, screens, back navigation), HTTP-backed agent actions,
+server-side persistence, telemetry, and ships a `create-autogen-ui` CLI.
+208 end-to-end tests, all green.
+
+### Added — host integration
+
+- **`BrandKit`** + `BrandProvider` (`brand.ts`, `brand-provider.tsx`).
+  Color tokens (22), dark overrides, typography, radius, voice rules,
+  guidelines. Compiles to CSS variables for the renderer AND a
+  `## BRAND` section appended to the cacheable system prompt. Six
+  starter kits ship: `violetKit` (default), `linearKit`, `warmKit`,
+  `sharpKit`, `monoKit`, `forestKit`.
+- **`createComponentAdapter`** + `mapComponent` (`adapter.ts`). Bridge
+  host React components into the registry: rename props (`title` →
+  `heading`), supply defaults, compute derived props, route children
+  into named slots.
+- **`createInlineStyleCompiler`** (`style-adapters.ts`). Alternate
+  `compileStyle` that emits inline `CSSProperties` (resolving colors
+  via `hsl(var(--token))`) for non-Tailwind hosts (styled-components,
+  Emotion, Tamagui, vanilla CSS Modules).
+
+### Added — framework primitives
+
+- **`Dashboard.layout` + `Outlet`** component. Persistent app shell:
+  declare a wrapper tree with an `Outlet` marker; the renderer swaps
+  in the active screen there on every navigation. Sidebars, top nav,
+  branded chrome survive screen changes.
+- **`navigateBack` action + screen history**. The `navigate` action
+  now pushes the previous `currentScreen` onto `state.screenHistory`.
+  `navigateBack` pops. At-root is a no-op.
+- **`defineFunction` + `callFunction`**. Agent declares its own
+  HTTP-backed actions with URL/body/header `{{args.X}}` templating.
+  `callFunction` resolves args against state + event payload, fires
+  the request (optionally through the data proxy), stores the result
+  in `data[into ?? name]`, and dispatches `onSuccess`/`onError`
+  action lists with `{{event.result}}` / `{{event.error}}` available.
+- **Spec migrations** (`migrateDashboard`). Walk older dashboard JSON
+  forward to current `SPEC_VERSION` via a registry of per-version
+  migrators. `deserializeDashboard` + the persistence handler both
+  route through it.
+
+### Added — server
+
+- **`createPersistenceHandler`** + `createMemoryStore`. Framework-
+  agnostic Web Request handler for GET (load) / POST (save) / DELETE /
+  LIST. Plug any backend store; the handler enforces size limits and
+  routes saves through `migrateDashboard`. Optional `authorize` gate.
+- **`useAutoSave`** hook. Debounced POST of every dashboard mutation
+  to the persistence endpoint, with AbortController + unmount cancel.
+
+### Added — agent & data
+
+- **`onTurn` telemetry hook** on `createUIAgent`. Fires `{
+  clientName, attempts, durationMs, patchCount, warningCount,
+  hadRepair, error? }` after every turn. Wrapped in a try/catch so
+  telemetry failures never crash the run.
+- **WebSocket data source** (`kind: "ws"`). Third `DataSource` variant
+  with `url`, `select?`, `onConnect?`. `useDataSources` manages the
+  socket lifecycle.
+- **17 compute filters**: `length`, `count`, `sum`/`sum:field`, `avg`,
+  `min`, `max`, `first`, `last`, `pluck:field`, `slice:N`, `reverse`,
+  `sort`/`sort:field`, `not`, `empty`. Chain with formatters.
+- **Per-source `errors`** in the runtime context. `useDataSources`
+  exposes `errors: Record<string, string|null>`; bindings can read
+  `{{errors.sourceId}}` and gate fallback UI via `when`.
+- **`ForEach` loops, `when` gate**. The two remaining control-flow
+  primitives. `ForEach` clones a template per item with scoped
+  bindings; `when` evaluates a binding expression and skips render
+  on falsy.
+- **`Link.to` for internal navigation** — alternative to `href`,
+  dispatches `navigate`.
+- **Table `events.onRowClick`** with `{{event.row}}`, `{{event.index}}`,
+  and per-column fields in the payload.
+- **`validateInput`** + form schema validation (`required`, `email`,
+  `url`, `minLength`, `maxLength`, `min`, `max`, `pattern`). Inputs +
+  Textarea render inline error messages with `aria-errormessage`.
+- **Chart interaction**: hover state, tooltip with tabular-num value,
+  dashed crosshair on line/area, opacity dimming for non-hovered bars.
+- **Modal a11y**: focus capture/restore, Esc to close, Tab/Shift+Tab
+  focus trap, `aria-labelledby` for title.
+
+### Added — distribution
+
+- **`create-autogen-ui`** new workspace package. `npx create-autogen-ui
+  my-app` scaffolds a Next.js 14 App Router project preconfigured with
+  the preset, brand provider, streaming route, and provider stubs
+  (`--provider claude|openai`, `--no-streaming` flag).
+- **Design pass** on the framework's own visual identity: signature
+  violet-indigo accent, warm-tinted neutrals, custom motion easing,
+  Stat with tabular-num count-up + sparkline, Chart with
+  chart-palette gradients + dotted reference grid.
+
+### Changed
+
+- Renderer wraps each node in `Framer.motion` with `siblingIndex`-based
+  stagger (36ms between siblings); inline-literal `extensions`/`context`
+  props are stabilised via `useShallowMemo` so re-renders don't
+  invalidate the merged ctx.
+- `RuntimeContext` gains `scope`, `loading`, `errors` channels.
+- `useRuntime` accepts `proxyUrl` and surfaces `loading` + `errors`.
+- `compileEvents` no longer wires `onChange`/`onSubmit` on the wrapper
+  (only `onClick`) — form components own those.
+- README rewritten to surface the integration story end-to-end.
+
+### Fixed
+
+- `useRuntime` now syncs `dashboard.state` → local state when the spec
+  changes externally (was a real bug — agent-driven `setState` patches
+  weren't rendering).
+- Registry no longer spread-merges client-module exports.
+
+### Tests
+
+52 → 208. Added coverage for ForEach expansion, `when` gate, screens
+routing, screen history (navigate/back), Outlet substitution, brand kit
+compilation, prompt injection, component adapters (renderToStaticMarkup),
+inline style compiler, persistence handler (round-trip + migration +
+authorize), agent telemetry, WebSocket source schema, compute filters,
+form validation, error path bindings, and `callFunction` substitution.
+
 ## [0.2.0] — 2026-05-16
 
 The "actually-importable" release. Tool-use agent, real-time streaming,

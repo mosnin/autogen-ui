@@ -1,6 +1,6 @@
 {
   "name": "@autogen-ui/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Talk to an AI and watch your dashboard build itself. JSON-spec UI runtime on Tailwind + shadcn + Framer Motion with tool-use agent, streaming, dynamic data and forms.",
   "license": "MIT",
   "type": "module",
