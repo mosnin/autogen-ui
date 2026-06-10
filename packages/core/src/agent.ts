@@ -50,6 +50,18 @@ export interface CreateUIAgentOptions {
    * sees, so the agent can actually use them.
    */
   components?: ComponentDoc[];
+  /**
+   * Custom-component **types** the agent should prefer over similar
+   * built-ins. Listed by `type` name. Surfaces a "PREFER these" section
+   * in the prompt so the agent reaches for host components first.
+   */
+  prefer?: string[];
+  /**
+   * Strict mode — the prompt explicitly forbids inventing new node types.
+   * The agent must use only the documented components. Recommended for
+   * production deployments inside host applications.
+   */
+  strict?: boolean;
   /** Extra product-specific guidance (tone, domain defaults, ...). */
   instructions?: string;
   /**
@@ -102,6 +114,8 @@ function buildBaseSystemPrompt(
   extraComponents: ComponentDoc[],
   instructions?: string,
   brand?: BrandKit,
+  prefer?: string[],
+  strict?: boolean,
 ): string {
   const base = `You are the UI engine behind autogen-ui. You build and edit a
 live dashboard by emitting patches against a JSON spec tree. You never write
@@ -132,7 +146,21 @@ RULES:
 
   const extra = instructions ? `\n\n## ADDITIONAL INSTRUCTIONS\n${instructions}` : "";
   const brandSection = brandToPromptSection(brand);
-  return base + capSections + extra + brandSection;
+
+  const preferSection =
+    prefer && prefer.length > 0
+      ? `\n\n## PREFER THESE COMPONENTS\nWhen multiple components could express the same thing, prefer the host's:\n${prefer
+          .map((t) => `- ${t}`)
+          .join(
+            "\n",
+          )}\nThese are the host application's own components and look native to their app.`
+      : "";
+
+  const strictSection = strict
+    ? `\n\n## STRICT MODE\nYou MUST only use component \`type\` values from the catalog above. Never invent new types. If a needed UI pattern can't be expressed with the available components, compose it from \`Box\` with \`style\`, OR describe the gap in your "message" field and emit no patch for that piece.`
+    : "";
+
+  return base + capSections + extra + brandSection + preferSection + strictSection;
 }
 
 /**
@@ -144,12 +172,16 @@ export function buildSystemSegments(opts: {
   components?: ComponentDoc[];
   instructions?: string;
   brand?: BrandKit;
+  prefer?: string[];
+  strict?: boolean;
 }): LLMSystemSegment[] {
   const text = buildBaseSystemPrompt(
     opts.capabilities ?? [],
     opts.components ?? [],
     opts.instructions,
     opts.brand,
+    opts.prefer,
+    opts.strict,
   );
   return [{ text, cache: true }];
 }
@@ -305,13 +337,22 @@ export function createUIAgent({
   client,
   capabilities = [],
   components = [],
+  prefer,
+  strict = false,
   instructions,
   brand,
   maxRepairAttempts = 2,
   repairOnWarnings = false,
   onTurn,
 }: CreateUIAgentOptions): UIAgent {
-  const system = buildSystemSegments({ capabilities, components, instructions, brand });
+  const system = buildSystemSegments({
+    capabilities,
+    components,
+    instructions,
+    brand,
+    prefer,
+    strict,
+  });
 
   return {
     async run(request) {

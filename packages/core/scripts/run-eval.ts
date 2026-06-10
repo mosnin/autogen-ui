@@ -1959,6 +1959,122 @@ function test(name: string, ok: boolean, detail = "") {
   );
 }
 
+// ---------- 43. strict + prefer surface in the system prompt.
+{
+  process.stdout.write("\n# strict mode + prefer\n");
+  let seenSystem = "";
+  const captureClient = createFakeClient([
+    (req) => {
+      const segs = Array.isArray(req.system) ? req.system : [{ text: req.system }];
+      seenSystem = segs.map((s) => s.text).join("\n");
+      return { message: "ok", patches: [] };
+    },
+  ]);
+  const agent = createUIAgent({
+    client: captureClient,
+    strict: true,
+    prefer: ["AcmeCard", "AcmeStat"],
+  });
+  await agent.run({ messages: [{ role: "user", content: "x" }] });
+  test("STRICT MODE section appears", /## STRICT MODE/.test(seenSystem));
+  test("PREFER section appears", /## PREFER THESE COMPONENTS/.test(seenSystem));
+  test("prefer list mentioned", /AcmeCard/.test(seenSystem) && /AcmeStat/.test(seenSystem));
+
+  // Without strict/prefer, those sections are absent.
+  let plainSystem = "";
+  const plain = createUIAgent({
+    client: createFakeClient([
+      (req) => {
+        const segs = Array.isArray(req.system) ? req.system : [{ text: req.system }];
+        plainSystem = segs.map((s) => s.text).join("\n");
+        return { message: "ok", patches: [] };
+      },
+    ]),
+  });
+  await plain.run({ messages: [{ role: "user", content: "x" }] });
+  test("no STRICT MODE by default", !/## STRICT MODE/.test(plainSystem));
+  test("no PREFER by default", !/## PREFER THESE COMPONENTS/.test(plainSystem));
+}
+
+// ---------- 44. voice.examples + voicePresets reach the prompt.
+{
+  process.stdout.write("\n# voice presets + examples\n");
+  const { brandToPromptSection } = await import("../src/brand");
+  const { voicePresets } = await import("../src/voice-presets");
+  const preset = voicePresets["engineer-minimal"];
+  test("engineer-minimal exists", !!preset && Array.isArray(preset.rules));
+  test(
+    "engineer-minimal forbids exclamation marks",
+    preset.rules?.some((r) => /exclamation/i.test(r)) === true,
+  );
+  const kit = {
+    name: "Acme",
+    voice: {
+      tone: "minimal",
+      examples: ["Set up your workspace", "Connect a data source"],
+    },
+  };
+  const prompt = brandToPromptSection(kit);
+  test("examples appear in prompt", /Match this voice/.test(prompt));
+  test("first example quoted", /"Set up your workspace"/.test(prompt));
+  test("second example quoted", /"Connect a data source"/.test(prompt));
+}
+
+// ---------- 45. createAgentFactory caches by config hash.
+{
+  process.stdout.write("\n# agent factory caching\n");
+  const { createAgentFactory } = await import("../src/agent-factory");
+  let build = 0;
+  // Tag the fake client so we can confirm equal-config calls reuse it.
+  const client = {
+    name: "fake-tagged",
+    async complete() {
+      build++;
+      return { text: "", toolCalls: [{ id: "x", name: "emit_patches", input: { patches: [] } }] };
+    },
+  };
+  const factory = createAgentFactory({ client });
+  const a1 = factory.get({ components: [{ type: "PricingTier", description: "x", props: "n: string", acceptsChildren: false }] });
+  const a2 = factory.get({ components: [{ type: "PricingTier", description: "x", props: "n: string", acceptsChildren: false }] });
+  test("identical config returns same agent", a1 === a2);
+  const a3 = factory.get({ components: [{ type: "Different", description: "y", props: "n: string", acceptsChildren: false }] });
+  test("different config returns different agent", a1 !== a3);
+  test("cache size grew", factory.size() === 2);
+  factory.clear();
+  test("clear empties cache", factory.size() === 0);
+  void build;
+}
+
+// ---------- 46. prepareServerSpec + placeholder HTML for SSR.
+{
+  process.stdout.write("\n# SSR helpers\n");
+  const { prepareServerSpec, renderDashboardPlaceholder } = await import(
+    "../src/server-render"
+  );
+  const d = emptyDashboard();
+  const withChildren = applyPatches(d, [
+    {
+      op: "append",
+      parentId: "root",
+      node: { id: "stat1", type: "Stat", props: { label: "x", value: 1 }, style: { span: 3 } },
+    },
+    {
+      op: "append",
+      parentId: "root",
+      node: { id: "chart1", type: "Chart", props: { kind: "bar", data: [] }, style: { span: 9 } },
+    },
+  ]);
+  const spec = prepareServerSpec(withChildren);
+  test("topLevelIds enumerated in order", JSON.stringify(spec.topLevelIds) === '["stat1","chart1"]');
+  test("estimatedHeight is positive", spec.estimatedHeight > 0);
+  const html = renderDashboardPlaceholder(withChildren);
+  test("placeholder HTML mentions Stat id", html.includes("stat1"));
+  test("placeholder HTML mentions Chart id", html.includes("chart1"));
+  test("placeholder reserves Stat span as 25%", html.includes("25%"));
+  test("placeholder reserves Chart span as 75%", html.includes("75%"));
+  test("placeholder uses --muted token", html.includes("hsl(var(--muted))"));
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

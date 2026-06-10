@@ -15,10 +15,11 @@ void _filename;
 const PKG_VERSION = "0.2.0";
 
 function usage() {
-  process.stdout.write(`create-autogen-ui — scaffold an autogen-ui app
+  process.stdout.write(`create-autogen-ui — scaffold or audit an autogen-ui app
 
 Usage:
-  npx create-autogen-ui [name]
+  npx create-autogen-ui [name]            Scaffold a new project
+  npx create-autogen-ui doctor            Audit the current directory
 
 Options:
   --provider <claude|openai>   LLM provider stub (default: claude)
@@ -27,10 +28,188 @@ Options:
 `);
 }
 
+// ---------- doctor: audit an existing repo for autogen-ui compatibility
+async function runDoctor() {
+  const { readFileSync, existsSync, readdirSync, statSync } = await import("node:fs");
+  const { resolve, join } = await import("node:path");
+  const root = process.cwd();
+
+  process.stdout.write(`\nauditing ${root}…\n\n`);
+
+  const issues = [];
+  const ok = [];
+  const advice = [];
+
+  // 1. package.json
+  const pkgPath = resolve(root, "package.json");
+  if (!existsSync(pkgPath)) {
+    issues.push("No package.json — run this in the root of a Node project.");
+    process.stderr.write(issues.join("\n") + "\n");
+    process.exit(1);
+  }
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+  const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  if (deps["@autogen-ui/core"]) ok.push(`@autogen-ui/core installed (${deps["@autogen-ui/core"]})`);
+  else
+    advice.push(
+      "Install the framework:  pnpm add @autogen-ui/core framer-motion",
+    );
+  if (deps["framer-motion"]) ok.push("framer-motion peer satisfied");
+  else if (!deps["@autogen-ui/core"]) {
+    // already advised
+  } else advice.push("Install peer:  pnpm add framer-motion");
+  if (deps.next) ok.push(`Next.js ${deps.next}`);
+  else if (deps.vite) ok.push(`Vite ${deps.vite}`);
+  else if (deps.react) ok.push("React app detected (non-Next)");
+  else advice.push("This audit assumes a React app.");
+
+  // 2. tailwind config
+  const tailwindCandidates = [
+    "tailwind.config.ts",
+    "tailwind.config.js",
+    "tailwind.config.mjs",
+    "tailwind.config.cjs",
+  ];
+  const twPath = tailwindCandidates.map((c) => resolve(root, c)).find(existsSync);
+  if (!twPath) {
+    advice.push(
+      "No tailwind config found. Tailwind is the default style transport; alternatively use `createInlineStyleCompiler()` from @autogen-ui/core.",
+    );
+  } else {
+    const tw = readFileSync(twPath, "utf-8");
+    ok.push(`tailwind config: ${twPath.slice(root.length + 1)}`);
+    if (tw.includes("@autogen-ui/core/tailwind.preset")) {
+      ok.push("tailwind preset wired");
+    } else {
+      advice.push(
+        "Add the preset to tailwind.config:\n  import preset from \"@autogen-ui/core/tailwind.preset\";\n  export default { presets: [preset], … };",
+      );
+    }
+    if (tw.includes("STATIC_SAFELIST") || tw.includes("safelist")) {
+      ok.push("tailwind safelist configured");
+    } else {
+      advice.push(
+        "Add the safelist so token-driven utility classes don't get purged:\n  import { STATIC_SAFELIST } from \"@autogen-ui/core/style\";\n  safelist: STATIC_SAFELIST.split(/\\s+/).filter(Boolean),",
+      );
+    }
+    if (
+      tw.includes("@autogen-ui/core/dist") ||
+      tw.includes("@autogen-ui/core/src") ||
+      tw.includes("packages/core/dist") ||
+      tw.includes("packages/core/src")
+    ) {
+      ok.push("tailwind content scans framework source");
+    } else {
+      advice.push(
+        "Include the framework in your `content` array so Tailwind sees its classes:\n  \"./node_modules/@autogen-ui/core/dist/**/*.js\",",
+      );
+    }
+  }
+
+  // 3. CSS variables — scan first 2 levels of src/, app/, styles/ for .css files
+  const REQUIRED_VARS = [
+    "--background",
+    "--foreground",
+    "--primary",
+    "--primary-foreground",
+    "--card",
+    "--card-foreground",
+    "--muted",
+    "--muted-foreground",
+    "--accent",
+    "--accent-foreground",
+    "--border",
+    "--input",
+    "--ring",
+  ];
+  const NICE_VARS = ["--success", "--warning", "--danger", "--primary-soft", "--chart-1"];
+
+  /** Treat `@import "@autogen-ui/core/styles.css"` as providing all defaults. */
+  function importsFrameworkStyles(blob) {
+    return /@import\s+["']@autogen-ui\/core\/styles\.css["']/.test(blob);
+  }
+  const cssDirs = ["app", "src", "styles", "src/styles", "src/app"]
+    .map((d) => resolve(root, d))
+    .filter((d) => existsSync(d) && statSync(d).isDirectory());
+  const cssFiles = [];
+  function walk(dir, depth = 0) {
+    if (depth > 3) return;
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      try {
+        const st = statSync(full);
+        if (st.isDirectory() && !entry.startsWith(".") && entry !== "node_modules") walk(full, depth + 1);
+        else if (entry.endsWith(".css")) cssFiles.push(full);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  cssDirs.forEach((d) => walk(d));
+  const cssBlob = cssFiles.map((f) => readFileSync(f, "utf-8")).join("\n");
+
+  const usesFrameworkStyles = importsFrameworkStyles(cssBlob);
+  const missingRequired = REQUIRED_VARS.filter((v) => !cssBlob.includes(v));
+  const missingNice = NICE_VARS.filter((v) => !cssBlob.includes(v));
+  if (cssFiles.length > 0) {
+    ok.push(`scanned ${cssFiles.length} css file(s) for design tokens`);
+    if (usesFrameworkStyles) {
+      ok.push(
+        "@import \"@autogen-ui/core/styles.css\" found — framework tokens supplied. Override individual vars in :root to match your brand.",
+      );
+    } else if (missingRequired.length === 0) {
+      ok.push("all required CSS variables present (shadcn-compatible)");
+    } else {
+      advice.push(
+        `Missing required CSS variables in globals: ${missingRequired.join(", ")}\nEither @import \"@autogen-ui/core/styles.css\" for sensible defaults, OR add them to :root { … } in your globals.css.`,
+      );
+    }
+    if (!usesFrameworkStyles && missingNice.length > 0) {
+      advice.push(
+        `Optional but recommended (semantic + chart palette):\n  :root {\n${missingNice.map((v) => `    ${v}: 0 0% 50%;`).join("\n")}\n  }`,
+      );
+    }
+  } else {
+    advice.push(
+      "No .css files found in app/ src/ styles/. The framework expects HSL-triplet CSS variables; see https://github.com/mosnin/autogen-ui#brand for the full list.",
+    );
+  }
+
+  // 4. Detect shadcn/ui
+  if (existsSync(resolve(root, "components.json"))) {
+    ok.push("shadcn/ui detected (components.json) — your Card/Button can be registered directly");
+    advice.push(
+      "Bridge shadcn components into the registry:\n  import { Card } from \"@/components/ui/card\";\n  const registry = createRegistry({ Card: createComponentAdapter({ Component: Card }) });",
+    );
+  }
+
+  // 5. Detect Next.js app/api route directory
+  if (existsSync(resolve(root, "app/api"))) {
+    ok.push("Next.js app router detected — mount the agent route at app/api/autogen-ui/stream/route.ts");
+  }
+
+  // ---- report
+  for (const o of ok) process.stdout.write(`  [32m✓[0m  ${o}\n`);
+  if (advice.length > 0) {
+    process.stdout.write(`\nrecommendations:\n`);
+    for (const a of advice) {
+      process.stdout.write(`\n  [33m→[0m  ${a}\n`);
+    }
+  } else {
+    process.stdout.write(`\n  all looks good. ship it.\n`);
+  }
+  process.stdout.write(`\n`);
+}
+
 // ---------- arg parsing
 const args = process.argv.slice(2);
 if (args.includes("-h") || args.includes("--help")) {
   usage();
+  process.exit(0);
+}
+
+if (args[0] === "doctor") {
+  await runDoctor();
   process.exit(0);
 }
 

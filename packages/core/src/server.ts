@@ -72,6 +72,23 @@ export {
   warmKit,
   type BrandPresetName,
 } from "./brand-presets";
+export { voicePresets, type VoicePresetName } from "./voice-presets";
+
+// Per-request agent factory — cache agents by config hash for role-based
+// component gating, multi-tenant brand swaps, etc.
+export {
+  createAgentFactory,
+  type AgentBuildOptions,
+  type AgentFactory,
+  type AgentFactoryOptions,
+} from "./agent-factory";
+
+// Server-render helpers — placeholder + spec preparation for SSR flows.
+export {
+  prepareServerSpec,
+  renderDashboardPlaceholder,
+  type ServerSpec,
+} from "./server-render";
 
 // Agent (standard + streaming) + route handlers
 export {

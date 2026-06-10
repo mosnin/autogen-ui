@@ -69,6 +69,13 @@ export const brandKitSchema = z
       .object({
         tone: z.string().optional(),
         rules: z.array(z.string()).optional(),
+        /**
+         * Sample copy from the host's app — headings, button labels,
+         * empty states. The agent gets these verbatim with a "match this
+         * voice" directive. Powerful when the host can't articulate
+         * their voice abstractly but has good examples.
+         */
+        examples: z.array(z.string()).optional(),
       })
       .optional(),
     /** Free-form prompt addendum. */
@@ -158,6 +165,10 @@ export function brandToPromptSection(kit: BrandKit | undefined): string {
   if (kit.voice?.rules && kit.voice.rules.length > 0) {
     lines.push("Content rules — strict:");
     for (const r of kit.voice.rules) lines.push(`- ${r}`);
+  }
+  if (kit.voice?.examples && kit.voice.examples.length > 0) {
+    lines.push("Match this voice — sample copy from the host's app:");
+    for (const e of kit.voice.examples) lines.push(`  • "${e}"`);
   }
   if (kit.radius) lines.push(`Default radius: ${kit.radius}.`);
   if (kit.typography?.sans) lines.push(`Body font: ${kit.typography.sans}.`);

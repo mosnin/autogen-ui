@@ -119,6 +119,7 @@ export {
   warmKit,
   type BrandPresetName,
 } from "./brand-presets";
+export { voicePresets, type VoicePresetName } from "./voice-presets";
 
 // Phase 3 — runtime component definition
 export { instantiateComponent, listComponentTypes, validateComponentDef } from "./define";
