@@ -217,6 +217,7 @@ export {
   type UseDashboardOptions,
   type UseDashboardResult,
 } from "./hooks/useDashboard";
+export { useAutoSave, type UseAutoSaveOptions } from "./hooks/useAutoSave";
 
 // Phase 5 — history, persistence, eval
 export {
