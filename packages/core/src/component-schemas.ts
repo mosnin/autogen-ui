@@ -145,6 +145,7 @@ export const builtinPropSchemas: ComponentPropSchemas = {
     .object({
       text: z.string(),
       level: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+      reveal: z.enum(["none", "words", "chars"]).optional(),
     })
     .passthrough(),
 
@@ -153,6 +154,8 @@ export const builtinPropSchemas: ComponentPropSchemas = {
       // bindable: a node may carry `bindings.text` and omit `props.text`.
       text: z.string().optional(),
       muted: z.boolean().optional(),
+      typewriter: z.boolean().optional(),
+      typewriterSpeed: z.number().optional(),
     })
     .passthrough(),
 

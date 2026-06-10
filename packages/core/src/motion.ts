@@ -46,6 +46,37 @@ const PRESETS: Record<string, MotionProps> = {
     exit: { opacity: 0, scale: 0.92 },
     transition: { duration: 0.3, ease: "easeOut" },
   },
+  /**
+   * `glow` — a one-shot ring pulse on arrival. Use on freshly-added nodes
+   * (e.g. a function result or a streamed-in stat) to signal "this just
+   * landed." The animation finishes and decays; it doesn't loop.
+   */
+  glow: {
+    initial: { opacity: 0, scale: 0.96, boxShadow: "0 0 0 0 hsl(var(--primary) / 0.35)" },
+    animate: {
+      opacity: 1,
+      scale: 1,
+      boxShadow: [
+        "0 0 0 0 hsl(var(--primary) / 0.35)",
+        "0 0 0 12px hsl(var(--primary) / 0)",
+        "0 0 0 0 hsl(var(--primary) / 0)",
+      ],
+    },
+    transition: {
+      duration: 0.9,
+      ease: "easeOut",
+      boxShadow: { duration: 1.1, times: [0, 0.6, 1] },
+    },
+  },
+  /**
+   * `typewriter` — gentle rise without scale; the *content* does the
+   * animating via Text's `typewriter` prop.
+   */
+  typewriter: {
+    initial: { opacity: 0, y: 4 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.2, ease: "easeOut" },
+  },
 };
 
 /** Compile a `MotionSpec` into Framer Motion props. */

@@ -1895,6 +1895,70 @@ function test(name: string, ok: boolean, detail = "") {
   test("functions populated by migration", loaded?.functions !== undefined);
 }
 
+// ---------- 40. Motion presets cover the arrival-pulse case.
+{
+  process.stdout.write("\n# motion presets\n");
+  const { compileMotion } = await import("../src/motion");
+  const fade = compileMotion({ preset: "fade" });
+  test("fade preset sets initial/animate/exit", !!fade.initial && !!fade.animate && !!fade.exit);
+  const rise = compileMotion({ preset: "rise" });
+  test("rise preset is a spring", JSON.stringify(rise.transition).includes("spring"));
+  const glow = compileMotion({ preset: "glow" });
+  test("glow preset exists", !!glow.animate);
+  // Glow's animate.boxShadow is the array signature of a one-shot pulse.
+  const glowAnimate = glow.animate as { boxShadow?: unknown };
+  test("glow pulses via boxShadow array", Array.isArray(glowAnimate.boxShadow));
+  const tw = compileMotion({ preset: "typewriter" });
+  test("typewriter preset exists", !!tw.initial && !!tw.animate);
+  // Unknown preset is ignored (returns empty object — no initial/animate).
+  const empty = compileMotion({ preset: "nope" as never });
+  test("unknown preset is a no-op", Object.keys(empty).length === 0);
+  // Explicit fields override preset defaults.
+  const override = compileMotion({ preset: "fade", initial: { opacity: 0.5 } });
+  test("explicit initial overrides preset", JSON.stringify(override.initial) === '{"opacity":0.5}');
+}
+
+// ---------- 41. Heading reveal + Text typewriter props are documented + schema-valid.
+{
+  process.stdout.write("\n# animation props\n");
+  const { builtinPropSchemas, validateNodeProps } = await import("../src/component-schemas");
+  test(
+    "Heading.reveal accepts 'words'",
+    validateNodeProps({ type: "Heading", props: { text: "Hi", reveal: "words" } }) === null,
+  );
+  test(
+    "Heading.reveal rejects garbage",
+    typeof validateNodeProps({ type: "Heading", props: { text: "Hi", reveal: "lol" } }) === "string",
+  );
+  test(
+    "Text.typewriter accepts boolean",
+    validateNodeProps({ type: "Text", props: { text: "Hi", typewriter: true } }) === null,
+  );
+  test(
+    "Text.typewriterSpeed accepts number",
+    validateNodeProps({
+      type: "Text",
+      props: { text: "Hi", typewriter: true, typewriterSpeed: 20 },
+    }) === null,
+  );
+  // Schema must still exist for every registered type.
+  test("schema registry covers Heading", "Heading" in builtinPropSchemas);
+  test("schema registry covers Text", "Text" in builtinPropSchemas);
+}
+
+// ---------- 42. styleCapability prompt teaches the new motion presets + Text typewriter.
+{
+  process.stdout.write("\n# capability prompt covers new animations\n");
+  const { styleCapability } = await import("../src/capabilities/style");
+  test("glow preset mentioned", /preset.*glow|"glow"/s.test(styleCapability.systemPrompt));
+  test("typewriter preset mentioned", /typewriter/i.test(styleCapability.systemPrompt));
+  test("Heading reveal mentioned", /Heading.*reveal/s.test(styleCapability.systemPrompt));
+  test(
+    "warns against combining glow + typewriter",
+    /glow \+ typewriter|combine glow/i.test(styleCapability.systemPrompt),
+  );
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

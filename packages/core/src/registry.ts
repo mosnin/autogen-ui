@@ -80,14 +80,16 @@ export const componentCatalog: ComponentDoc[] = [
   },
   {
     type: "Heading",
-    description: "Section heading.",
-    props: "text: string, level?: 1|2|3",
+    description:
+      "Section heading. Set `reveal: 'words'` or `'chars'` for a staggered fade-in entrance — feels deliberate when this heading is the result of a fresh agent generation.",
+    props: "text: string, level?: 1|2|3, reveal?: 'none'|'words'|'chars'",
     acceptsChildren: false,
   },
   {
     type: "Text",
-    description: "Paragraph of body text.",
-    props: "text: string, muted?: boolean",
+    description:
+      "Paragraph of body text. Pass `typewriter: true` to type the text in character-by-character on mount and on content change — a powerful effect for agent-generated narrative copy. `typewriterSpeed` is ms per character (default 14).",
+    props: "text: string, muted?: boolean, typewriter?: boolean, typewriterSpeed?: number",
     acceptsChildren: false,
   },
   {

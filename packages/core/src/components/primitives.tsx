@@ -198,7 +198,29 @@ export const Stat: RegistryComponent = ({ label, value, delta, trend, sparkline 
   );
 };
 
-export const Heading: RegistryComponent = ({ text, level }) => {
+function useTypewriter(target: string, speedMs: number): string {
+  const [shown, setShown] = useState(speedMs <= 0 ? target : "");
+  useEffect(() => {
+    if (speedMs <= 0) {
+      setShown(target);
+      return;
+    }
+    setShown("");
+    if (!target) return;
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setShown(target.slice(0, i));
+      if (i >= target.length) clearInterval(id);
+    }, speedMs);
+    return () => clearInterval(id);
+  }, [target, speedMs]);
+  return shown;
+}
+
+const REVEAL_VARIANTS = ["none", "words", "chars"] as const;
+
+export const Heading: RegistryComponent = ({ text, level, reveal }) => {
   const lvl = oneOf(String(num(level, 2)), ["1", "2", "3"] as const, "2");
   const cls = {
     "1": "text-2xl font-bold tracking-tight",
@@ -208,16 +230,62 @@ export const Heading: RegistryComponent = ({ text, level }) => {
   const content = str(text);
   const slug = content ? slugify(content) : "";
   const id = slug || undefined;
-  if (lvl === "1") return <h1 id={id} className={cls}>{content}</h1>;
-  if (lvl === "3") return <h3 id={id} className={cls}>{content}</h3>;
-  return <h2 id={id} className={cls}>{content}</h2>;
+  const mode = oneOf(reveal, REVEAL_VARIANTS, "none");
+  let body: ReactNode = content;
+  if (content && (mode === "words" || mode === "chars")) {
+    const parts = mode === "words" ? content.split(/(\s+)/) : Array.from(content);
+    body = parts.map((part, i) =>
+      /^\s+$/.test(part) ? (
+        <span key={i}>{part}</span>
+      ) : (
+        <motion.span
+          key={i}
+          aria-hidden={part === ""}
+          style={{ display: "inline-block" }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.36,
+            ease: EASE_OUT,
+            delay: 0.04 + i * (mode === "words" ? 0.05 : 0.025),
+          }}
+        >
+          {part}
+        </motion.span>
+      ),
+    );
+  }
+  if (lvl === "1") return <h1 id={id} className={cls}>{body}</h1>;
+  if (lvl === "3") return <h3 id={id} className={cls}>{body}</h3>;
+  return <h2 id={id} className={cls}>{body}</h2>;
 };
 
-export const Text: RegistryComponent = ({ text, muted }) => (
-  <p className={cn("text-sm leading-relaxed", muted ? "text-muted-foreground" : "text-foreground")}>
-    {str(text)}
-  </p>
-);
+export const Text: RegistryComponent = ({ text, muted, typewriter, typewriterSpeed }) => {
+  const full = str(text);
+  const isTw = bool(typewriter, false);
+  const speed = isTw ? Math.max(0, num(typewriterSpeed, 14)) : 0;
+  const shown = useTypewriter(full, speed);
+  const showCaret = isTw && shown.length < full.length;
+  return (
+    <p
+      className={cn(
+        "text-sm leading-relaxed",
+        muted ? "text-muted-foreground" : "text-foreground",
+      )}
+      aria-label={isTw ? full : undefined}
+    >
+      {shown}
+      {showCaret && (
+        <motion.span
+          aria-hidden
+          className="ml-0.5 inline-block h-[1em] w-[2px] -mb-[2px] align-middle bg-primary"
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ duration: 0.85, repeat: Infinity, ease: "linear" }}
+        />
+      )}
+    </p>
+  );
+};
 
 const BADGE_VARIANT: Record<string, string> = {
   default: "bg-primary text-primary-foreground",
