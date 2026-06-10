@@ -172,3 +172,68 @@ export const editScript: AgentScript = {
     },
   ],
 };
+
+/** A small "embedded panel" — a single Card with a Chart and two Stats. */
+export const embeddedScript: AgentScript = {
+  prompt: "Show this user's engagement.",
+  steps: [
+    { delay: 200, patch: { op: "setTitle", title: "User insights" } },
+    {
+      delay: 360,
+      patch: {
+        op: "append",
+        parentId: "root",
+        node: {
+          id: "active_streak",
+          type: "Stat",
+          props: {
+            label: "Streak",
+            value: 42,
+            delta: "+7 days",
+            trend: "up",
+            sparkline: [3, 5, 8, 12, 18, 28, 42],
+          },
+          style: { span: 6 },
+        },
+      },
+    },
+    {
+      delay: 300,
+      patch: {
+        op: "append",
+        parentId: "root",
+        node: {
+          id: "session_avg",
+          type: "Stat",
+          props: {
+            label: "Avg. session",
+            value: "8m 24s",
+            delta: "+1m 12s",
+            trend: "up",
+          },
+          style: { span: 6 },
+        },
+      },
+    },
+    {
+      delay: 480,
+      patch: {
+        op: "append",
+        parentId: "root",
+        node: {
+          id: "activity",
+          type: "Chart",
+          props: {
+            kind: "area",
+            title: "Activity this month",
+            data: Array.from({ length: 14 }, (_, i) => ({
+              label: `D${i + 1}`,
+              value: Math.round(20 + Math.sin(i / 2) * 12 + i * 1.8),
+            })),
+          },
+          style: { span: 12 },
+        },
+      },
+    },
+  ],
+};

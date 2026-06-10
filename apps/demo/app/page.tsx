@@ -225,9 +225,11 @@ export default function Page() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, ease: SLOW as never }}
-                    className="font-display text-[44px] leading-[1.05] tracking-[-0.025em] text-foreground"
+                    className="font-display text-[56px] font-semibold leading-[1.0] tracking-[-0.035em] text-foreground sm:text-[64px]"
                   >
-                    What should it look like?
+                    What should it
+                    <br />
+                    look like?
                   </motion.h1>
                   <motion.p
                     initial={{ opacity: 0, y: 6 }}
@@ -237,10 +239,9 @@ export default function Page() {
                       ease: SLOW as never,
                       delay: 0.1,
                     }}
-                    className="mt-5 max-w-md text-[15px] leading-relaxed text-muted-foreground"
+                    className="mt-6 max-w-md text-[15px] leading-relaxed text-muted-foreground"
                   >
-                    Describe a dashboard. The model builds it, and every
-                    follow-up message edits it in place.
+                    Describe what you want.
                   </motion.p>
                   <motion.div
                     initial={{ opacity: 0 }}
