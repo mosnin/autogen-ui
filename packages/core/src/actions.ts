@@ -18,6 +18,20 @@ export interface CreateDispatcherArgs {
   scrollTo?: (nodeId: string) => void;
   /** Notified for `emitEvent` actions. */
   onEvent?: (name: string, payload: unknown) => void;
+  /**
+   * Optional handler for `callFunction` actions — fires an agent-defined
+   * function (e.g. an HTTP POST) and dispatches onSuccess/onError lists.
+   */
+  callFunction?: (
+    name: string,
+    args: unknown,
+    callbacks: {
+      into?: string;
+      onSuccess?: unknown[];
+      onError?: unknown[];
+    },
+    eventPayload?: Record<string, unknown>,
+  ) => void;
 }
 
 /** Read a dot-path out of a plain object. */
@@ -77,6 +91,10 @@ function resolveAction(action: Action, payload?: Record<string, unknown>): Actio
       return { ...action, url: String(substitute(action.url)) };
     case "scrollTo":
       return { ...action, nodeId: String(substitute(action.nodeId)) };
+    case "callFunction":
+      return action.args === undefined
+        ? action
+        : { ...action, args: substitute(action.args) };
     default:
       return action;
   }
@@ -88,7 +106,7 @@ function resolveAction(action: Action, payload?: Record<string, unknown>): Actio
  * `payload` carries event data referenceable via `{{event.<key>}}`.
  */
 export function createDispatcher(args: CreateDispatcherArgs) {
-  const { getState, setState, refetch, scrollTo, onEvent } = args;
+  const { getState, setState, refetch, scrollTo, onEvent, callFunction } = args;
 
   return function dispatch(actions: Action[], payload?: Record<string, unknown>): void {
     for (const raw of actions) {
@@ -124,6 +142,18 @@ export function createDispatcher(args: CreateDispatcherArgs) {
           break;
         case "navigate":
           setState("currentScreen", action.to);
+          break;
+        case "callFunction":
+          callFunction?.(
+            action.name,
+            action.args ?? {},
+            {
+              into: action.into,
+              onSuccess: action.onSuccess,
+              onError: action.onError,
+            },
+            payload,
+          );
           break;
         default:
           break;

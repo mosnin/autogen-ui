@@ -157,6 +157,18 @@ export function applyPatch(dashboard: Dashboard, patch: Patch): Dashboard {
       return { ...dashboard, dataSources };
     }
 
+    case "defineFunction":
+      return {
+        ...dashboard,
+        functions: { ...dashboard.functions, [patch.def.name]: patch.def },
+      };
+
+    case "removeFunction": {
+      const functions = { ...dashboard.functions };
+      delete functions[patch.name];
+      return { ...dashboard, functions };
+    }
+
     case "setState":
       return { ...dashboard, state: setPath(dashboard.state, patch.path, patch.value) as Dashboard["state"] };
 
@@ -200,6 +212,9 @@ function checkPatchTargets(d: Dashboard, p: Patch): string | null {
   }
   if (p.op === "removeDataSource" && !d.dataSources[p.id]) {
     return `unknown data source "${p.id}"`;
+  }
+  if (p.op === "removeFunction" && !d.functions[p.name]) {
+    return `unknown function "${p.name}"`;
   }
   return null;
 }

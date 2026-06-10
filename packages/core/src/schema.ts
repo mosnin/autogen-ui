@@ -159,6 +159,19 @@ export const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("emitEvent"), name: z.string(), payload: jsonValueSchema.optional() }),
   /** Navigate to a screen key (sets state.currentScreen). */
   z.object({ type: z.literal("navigate"), to: z.string() }),
+  /**
+   * Call an agent-defined function. Resolves args against the live context,
+   * fires the function (HTTP), and on resolution dispatches `onSuccess` /
+   * `onError`. The result is stored in `data[into ?? name]`.
+   */
+  z.object({
+    type: z.literal("callFunction"),
+    name: z.string(),
+    args: jsonValueSchema.optional(),
+    into: z.string().optional(),
+    onSuccess: z.array(z.unknown()).optional(),
+    onError: z.array(z.unknown()).optional(),
+  }),
 ]);
 export type Action = z.infer<typeof actionSchema>;
 
@@ -227,6 +240,28 @@ export const componentDefSchema = z.object({
 export type ComponentDef = z.infer<typeof componentDefSchema>;
 
 /* ------------------------------------------------------------------ *
+ * FunctionDef — agent-declared callable actions (HTTP-backed).
+ * ------------------------------------------------------------------ */
+
+export const functionDefSchema = z.object({
+  /** Identifier the agent uses with `callFunction`. */
+  name: z.string().min(1),
+  description: z.string().optional(),
+  /** Optional JSON-Schema describing accepted args (informational). */
+  inputSchema: jsonValueSchema.optional(),
+  kind: z.literal("http").default("http"),
+  /** May contain `{{args.X}}` / `{{state.X}}` tokens. */
+  url: z.string().min(1),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("POST"),
+  headers: z.record(z.string()).optional(),
+  /** Body may also contain token substitutions. */
+  body: jsonValueSchema.optional(),
+  /** Optional dot-path into the response. */
+  select: z.string().optional(),
+});
+export type FunctionDef = z.infer<typeof functionDefSchema>;
+
+/* ------------------------------------------------------------------ *
  * DataSource — where dynamic data comes from.
  * ------------------------------------------------------------------ */
 
@@ -292,6 +327,8 @@ export const dashboardSchema = z.object({
   components: z.record(componentDefSchema).default({}),
   /** Data sources, keyed by id. */
   dataSources: z.record(dataSourceSchema).default({}),
+  /** Agent-declared callable functions, keyed by name. */
+  functions: z.record(functionDefSchema).default({}),
   /** Client-side reactive state (filters, toggles, form values, ...). */
   state: z.record(jsonValueSchema).default({}),
   /**
@@ -336,6 +373,8 @@ export const patchSchema = z.discriminatedUnion("op", [
   // data & behaviour (Phase 4)
   z.object({ op: z.literal("setDataSource"), source: dataSourceSchema }),
   z.object({ op: z.literal("removeDataSource"), id: z.string() }),
+  z.object({ op: z.literal("defineFunction"), def: functionDefSchema }),
+  z.object({ op: z.literal("removeFunction"), name: z.string() }),
   z.object({ op: z.literal("setState"), path: z.string(), value: jsonValueSchema }),
   z.object({
     op: z.literal("setBindings"),
@@ -404,6 +443,7 @@ export function emptyDashboard(id = "dashboard"): Dashboard {
     theme: undefined,
     components: {},
     dataSources: {},
+    functions: {},
     state: {},
     screens: undefined,
   };

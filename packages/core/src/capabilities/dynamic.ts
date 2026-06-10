@@ -73,6 +73,36 @@ Use \`Dashboard.screens?: Record<name, UINode>\` for alternate roots. When
 instead of \`root\`. Set with \`{ "type": "navigate", "to": string }\` or use
 \`Link\` with \`to\` instead of \`href\`. Typical use: dashboard ⇄ detail ⇄ settings.
 
+### Agent-defined functions — \`defineFunction\`
+Declare a callable function backed by HTTP. Use this when an interaction needs
+to hit an endpoint that isn't read-only fetched data (saving, deleting, kicking
+off a workflow, calling a third-party API).
+
+\`{ "op": "defineFunction", "def": {
+  "name": "saveContact",
+  "description": "Save a contact to the CRM",
+  "inputSchema": { "type":"object", "properties":{"email":{"type":"string"}}, "required":["email"] },
+  "url": "https://api.example.com/contacts",
+  "method": "POST",
+  "headers": { "x-api-key": "{{state.apiKey}}" },
+  "body": { "email": "{{args.email}}", "name": "{{args.name}}" },
+  "select": "data.id"
+}}\`
+
+\`{ "op": "removeFunction", "name": string }\` drops it. \`url\`/\`headers\`/\`body\`
+support \`{{args.X}}\` tokens (resolved at call time against the action's args).
+
+Invoke from any event:
+\`{ "type": "callFunction", "name": "saveContact",
+   "args": { "email": "{{event.value}}", "name": "{{state.name}}" },
+   "into"?: string,                 // data key for the result; defaults to name
+   "onSuccess"?: Action[],          // dispatched with {{event.result}} = response
+   "onError"?: Action[]             // dispatched with {{event.error}} = message
+}\`
+
+The resolved result lands in \`data.<into ?? name>\` so bindings + ForEach can
+read it without an extra patch turn.
+
 ### Events — \`setEvents\`
 \`{ "op": "setEvents", "id": string, "events": EventMap | null }\`
 EventMap maps event names (\`onClick\`, \`onChange\`, \`onSubmit\`, \`onRowClick\`)
@@ -81,6 +111,8 @@ to ordered Actions:
 - \`{ "type": "toggleState", "path": string }\`
 - \`{ "type": "refetch", "sourceId": string }\`
 - \`{ "type": "navigate", "to": string }\`
+- \`{ "type": "callFunction", "name": string, "args"?: JSON, "into"?: string,
+    "onSuccess"?: Action[], "onError"?: Action[] }\`
 - \`{ "type": "openUrl", "url": string, "newTab"?: boolean }\`
 - \`{ "type": "scrollTo", "nodeId": string }\`
 - \`{ "type": "emitEvent", "name": string, "payload"?: JSON }\`
