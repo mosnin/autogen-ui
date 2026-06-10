@@ -125,6 +125,7 @@ export const revenueSeed: Dashboard = {
   theme: undefined,
   components: {},
   dataSources: {},
+  functions: {},
   state: {},
 };
 
@@ -207,6 +208,7 @@ export const fitnessSeed: Dashboard = {
   theme: undefined,
   components: {},
   dataSources: {},
+  functions: {},
   state: {},
 };
 
@@ -271,6 +273,7 @@ export const contentSeed: Dashboard = {
   theme: undefined,
   components: {},
   dataSources: {},
+  functions: {},
   state: {},
 };
 
