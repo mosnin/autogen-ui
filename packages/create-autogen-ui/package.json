@@ -1,0 +1,23 @@
+{
+  "name": "create-autogen-ui",
+  "version": "0.2.0",
+  "description": "Scaffold a Next.js app preconfigured with @autogen-ui/core.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-autogen-ui": "./bin/index.mjs"
+  },
+  "files": ["bin"],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["autogen-ui", "ai", "agent", "dashboard", "create", "nextjs"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mosnin/autogen-ui.git",
+    "directory": "packages/create-autogen-ui"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
