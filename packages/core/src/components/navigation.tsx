@@ -148,8 +148,27 @@ export const Accordion: RegistryComponent = ({ node, items, openValues, children
  * Link
  * ------------------------------------------------------------------ */
 
-export const Link: RegistryComponent = ({ href, text, newTab }) => {
+export const Link: RegistryComponent = ({ href, text, newTab, to }) => {
+  const { dispatch } = useRuntimeContext();
   const isExternal = bool(newTab, false);
+  const screen = str(to);
+
+  // `to` overrides `href`: internal screen navigation via state.currentScreen.
+  if (screen) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          dispatch([{ type: "navigate", to: screen }]);
+        }}
+        className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors text-sm font-medium"
+      >
+        {str(text, screen)}
+      </button>
+    );
+  }
+
   return (
     <a
       href={str(href, "#")}

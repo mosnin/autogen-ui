@@ -3,6 +3,7 @@
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { useEffect, type ReactNode } from "react";
 import { EASE_OUT } from "../_easing";
+import { useRuntimeContext } from "../runtime-context";
 import { cn } from "../utils";
 import { arr, bool, num, oneOf, str } from "./helpers";
 import type { RegistryComponent } from "./types";
@@ -316,10 +317,14 @@ export const List: RegistryComponent = ({ items, ordered }) => {
 };
 
 /** Simple data table. `columns: string[]`, `rows: (string|number)[][]`. */
-export const Table: RegistryComponent = ({ columns, rows, caption }) => {
+export const Table: RegistryComponent = ({ node, columns, rows, caption }) => {
+  const { dispatch } = useRuntimeContext();
   const cols = arr<string>(columns).map((c) => String(c));
   const data = arr<unknown[]>(rows);
   const captionText = str(caption);
+  const onRowClick = (node?.events as Record<string, unknown> | undefined)?.onRowClick;
+  const rowClickActions = Array.isArray(onRowClick) ? onRowClick : null;
+
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table
@@ -345,15 +350,38 @@ export const Table: RegistryComponent = ({ columns, rows, caption }) => {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, ri) => (
-            <tr key={ri} className="border-t border-border">
-              {arr(row).map((cell, ci) => (
-                <td key={ci} className="px-3 py-2">
-                  {typeof cell === "number" ? cell.toLocaleString() : String(cell ?? "")}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {data.map((row, ri) => {
+            const cells = arr(row);
+            const rowPayload: Record<string, unknown> = { index: ri, row };
+            // If row is an object-keyed map, also surface its fields.
+            if (row && typeof row === "object" && !Array.isArray(row)) {
+              Object.assign(rowPayload, row as Record<string, unknown>);
+            } else {
+              cols.forEach((col, ci) => {
+                if (col) rowPayload[col] = cells[ci];
+              });
+            }
+            return (
+              <tr
+                key={ri}
+                onClick={
+                  rowClickActions
+                    ? () => dispatch(rowClickActions as never, rowPayload)
+                    : undefined
+                }
+                className={cn(
+                  "border-t border-border",
+                  rowClickActions && "cursor-pointer transition-colors hover:bg-accent/50",
+                )}
+              >
+                {cells.map((cell, ci) => (
+                  <td key={ci} className="px-3 py-2">
+                    {typeof cell === "number" ? cell.toLocaleString() : String(cell ?? "")}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

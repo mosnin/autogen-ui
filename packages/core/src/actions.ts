@@ -122,6 +122,9 @@ export function createDispatcher(args: CreateDispatcherArgs) {
         case "emitEvent":
           onEvent?.(action.name, action.payload ?? null);
           break;
+        case "navigate":
+          setState("currentScreen", action.to);
+          break;
         default:
           break;
       }

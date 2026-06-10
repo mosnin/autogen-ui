@@ -148,6 +148,14 @@ export const componentCatalog: ComponentDoc[] = [
     acceptsChildren: false,
   },
   {
+    type: "ForEach",
+    description:
+      "Repeats its first child once per item in `source`. Inside the template, bindings can reference `{{<as>.X}}` (default `as` is \"item\") and the loop index via `{{<indexAs>}}` (default \"i\"). Events on the template are rewritten with concrete per-iteration values at expansion time.",
+    props:
+      "source: string (a binding-style path like 'data.items' or 'state.cart'), as?: string (default 'item'), indexAs?: string (default 'i')",
+    acceptsChildren: true,
+  },
+  {
     type: "Input",
     description:
       "Text input. Wire `events.onChange` with a setState action that reads `{{event.value}}` to drive state. Bind `value` to that same state for a controlled input.",
@@ -277,6 +285,8 @@ export const defaultRegistry: ComponentRegistry = {
   Image,
   Icon,
   Spacer,
+  // ForEach resolves to Box before render; reuse Box as the renderer.
+  ForEach: Box,
   Input,
   Textarea,
   Select,

@@ -1193,6 +1193,169 @@ function test(name: string, ok: boolean, detail = "") {
   }
 }
 
+// ---------- 17. ForEach expands list into N children with scoped bindings.
+{
+  process.stdout.write("\n# ForEach expansion\n");
+  const { expandForEach } = await import("../src/_foreach");
+  const { resolveBindings } = await import("../src/data");
+  const ctx = {
+    dashboard: emptyDashboard(),
+    data: { items: [{ name: "Alice", id: 1 }, { name: "Bob", id: 2 }, { name: "Carol", id: 3 }] },
+    state: {},
+    loading: {},
+    scope: {},
+    dispatch: () => {},
+  };
+  const node = {
+    id: "loop",
+    type: "ForEach",
+    props: { source: "data.items", as: "item" },
+    children: [
+      {
+        id: "row",
+        type: "Card",
+        props: { title: "x" },
+        bindings: { title: "{{item.name}}" },
+        events: {
+          onClick: [{ type: "setState", path: "selected", value: "{{item.id}}" }],
+        },
+      },
+    ],
+  };
+  const expanded = expandForEach(node, ctx);
+  test("ForEach expands to Box", expanded.type === "Box");
+  test("expansion produced 3 children", (expanded.children?.length ?? 0) === 3);
+  const c0 = expanded.children?.[0];
+  test("each child has unique id", c0?.id === "row__0");
+  test("each child carries _scope prop", (c0?.props?._scope as { item?: { name: string } })?.item?.name === "Alice");
+  // events are rewritten to concrete per-iteration values
+  const onClick = (c0?.events as { onClick?: { value?: unknown }[] })?.onClick;
+  test("event actions rewritten with concrete scope", onClick?.[0]?.value === 1);
+  // bindings resolved per-iteration via scope
+  const c1 = expanded.children?.[1];
+  const resolved = resolveBindings(c1!, { ...ctx, scope: c1!.props?._scope as Record<string, unknown> });
+  test("scoped binding resolves to per-row value", resolved.props?.title === "Bob");
+  // non-array source returns empty Box
+  const empty = expandForEach({ ...node, props: { source: "data.missing" } }, ctx);
+  test("missing source produces empty Box", empty.type === "Box" && (empty.children?.length ?? 0) === 0);
+}
+
+// ---------- 18. `when` prop gates rendering by binding expression.
+{
+  process.stdout.write("\n# when gate\n");
+  const { evaluateBinding } = await import("../src/data");
+  const truthy = evaluateBinding("{{state.show}}", {
+    dashboard: emptyDashboard(),
+    data: {},
+    state: { show: true },
+    loading: {},
+    scope: {},
+    dispatch: () => {},
+  });
+  const falsy = evaluateBinding("{{state.show}}", {
+    dashboard: emptyDashboard(),
+    data: {},
+    state: { show: false },
+    loading: {},
+    scope: {},
+    dispatch: () => {},
+  });
+  test("truthy state passes the gate", Boolean(truthy) === true);
+  test("falsy state blocks the gate", Boolean(falsy) === false);
+  // | not filter inverts
+  const inverted = evaluateBinding("{{state.show | not}}", {
+    dashboard: emptyDashboard(),
+    data: {},
+    state: { show: false },
+    loading: {},
+    scope: {},
+    dispatch: () => {},
+  });
+  test("`| not` filter inverts truthiness", Boolean(inverted) === true);
+}
+
+// ---------- 19. navigate action sets state.currentScreen.
+{
+  process.stdout.write("\n# navigate action\n");
+  const { createDispatcher } = await import("../src/actions");
+  const writes: { path: string; value: unknown }[] = [];
+  const dispatch = createDispatcher({
+    getState: () => ({}),
+    setState: (path, value) => writes.push({ path, value }),
+    refetch: () => {},
+  });
+  dispatch([{ type: "navigate", to: "settings" }]);
+  test("navigate writes currentScreen", writes[0]?.path === "currentScreen" && writes[0]?.value === "settings");
+}
+
+// ---------- 20. Screens routing picks the matching screen.
+{
+  process.stdout.write("\n# screens routing\n");
+  const { dashboardSchema } = await import("../src/schema");
+  const d = dashboardSchema.parse({
+    id: "d",
+    root: { id: "root", type: "Grid", children: [{ id: "main", type: "Text", props: { text: "main" } }] },
+    state: { currentScreen: "settings" },
+    screens: {
+      settings: { id: "settings_root", type: "Grid", children: [{ id: "sp", type: "Text", props: { text: "settings" } }] },
+    },
+  });
+  // simulate the renderer's pick
+  const picked =
+    typeof d.state.currentScreen === "string" && d.screens?.[d.state.currentScreen]
+      ? d.screens[d.state.currentScreen]
+      : d.root;
+  test("settings screen resolves", picked?.id === "settings_root");
+  // when no match, root wins
+  const d2 = dashboardSchema.parse({ ...d, state: { currentScreen: "missing" } });
+  const picked2 =
+    typeof d2.state.currentScreen === "string" && d2.screens?.[d2.state.currentScreen]
+      ? d2.screens[d2.state.currentScreen]
+      : d2.root;
+  test("missing screen falls back to root", picked2?.id === "root");
+}
+
+// ---------- 21. Compute filters: length, sum, pluck, slice.
+{
+  process.stdout.write("\n# compute filters\n");
+  const { resolveBindings } = await import("../src/data");
+  const ctx = {
+    dashboard: emptyDashboard(),
+    data: { items: [{ price: 10 }, { price: 20 }, { price: 30 }, { price: 40 }] },
+    state: {},
+    loading: {},
+    scope: {},
+    dispatch: () => {},
+  };
+  const make = (expr: string) =>
+    resolveBindings(
+      { id: "n", type: "Text", props: { text: "" }, bindings: { text: expr } },
+      ctx,
+    ).props?.text;
+  test("length on array", make("{{data.items | length}}") === 4);
+  test("sum:field totals", make("{{data.items | sum:price}}") === 100);
+  test("avg:field averages", make("{{data.items | avg:price}}") === 25);
+  test("pluck:field extracts column", JSON.stringify(make("{{data.items | pluck:price | json}}")) === "\"[10,20,30,40]\"");
+  test("slice:N trims", JSON.stringify(make("{{data.items | slice:2 | json}}")) === "\"[{\\\"price\\\":10},{\\\"price\\\":20}]\"");
+  test("first item", (make("{{data.items | first}}") as { price?: number })?.price === 10);
+  test("empty on empty array", make("{{data.empty | empty}}") === true);
+}
+
+// ---------- 22. WebSocket source schema accepted.
+{
+  process.stdout.write("\n# ws data source\n");
+  const { dataSourceSchema } = await import("../src/schema");
+  const parsed = dataSourceSchema.safeParse({
+    kind: "ws",
+    id: "live",
+    url: "wss://example.com/live",
+    select: "data.events",
+  });
+  test("ws source parses", parsed.success);
+  const bad = dataSourceSchema.safeParse({ kind: "ws", id: "x", url: "not a url" });
+  test("invalid ws url rejected", !bad.success);
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

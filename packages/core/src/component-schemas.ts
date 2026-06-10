@@ -226,6 +226,14 @@ export const builtinPropSchemas: ComponentPropSchemas = {
 
   Spacer: z.object({}).passthrough(),
 
+  ForEach: z
+    .object({
+      source: z.string(),
+      as: z.string().optional(),
+      indexAs: z.string().optional(),
+    })
+    .passthrough(),
+
   Input: z
     .object({
       type: z.enum(["text", "number", "email", "password", "search", "url", "tel"]).optional(),

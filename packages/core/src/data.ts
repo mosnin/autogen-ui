@@ -58,6 +58,17 @@ function toDate(v: unknown): Date | null {
   return null;
 }
 
+function toArray<T = unknown>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
+}
+
+function pluck(arr: unknown[], field: string): unknown[] {
+  return arr.map((item) => {
+    if (item && typeof item === "object") return (item as Record<string, unknown>)[field];
+    return undefined;
+  });
+}
+
 export const builtinFilters: Record<string, FilterFn> = {
   currency: (v, arg) => {
     const n = toNumber(v);
@@ -104,6 +115,78 @@ export const builtinFilters: Record<string, FilterFn> = {
   },
   json: (v) => JSON.stringify(v),
   default: (v, arg) => (v == null || v === "" ? (arg ?? "") : v),
+
+  /* Computed filters — array/string utilities. */
+  length: (v) => {
+    if (Array.isArray(v) || typeof v === "string") return v.length;
+    if (v && typeof v === "object") return Object.keys(v as object).length;
+    return 0;
+  },
+  count: (v) => {
+    if (Array.isArray(v) || typeof v === "string") return v.length;
+    if (v && typeof v === "object") return Object.keys(v as object).length;
+    return 0;
+  },
+  sum: (v, arg) => {
+    const items = toArray(v);
+    const values = arg ? pluck(items, arg) : items;
+    return values.reduce<number>((acc, n) => {
+      const num = toNumber(n);
+      return Number.isNaN(num) ? acc : acc + num;
+    }, 0);
+  },
+  avg: (v, arg) => {
+    const items = toArray(v);
+    const values = arg ? pluck(items, arg) : items;
+    const nums = values.map((n) => toNumber(n)).filter((n) => !Number.isNaN(n));
+    if (nums.length === 0) return 0;
+    return nums.reduce((acc, n) => acc + n, 0) / nums.length;
+  },
+  min: (v, arg) => {
+    const items = toArray(v);
+    const values = arg ? pluck(items, arg) : items;
+    const nums = values.map((n) => toNumber(n)).filter((n) => !Number.isNaN(n));
+    return nums.length === 0 ? null : Math.min(...nums);
+  },
+  max: (v, arg) => {
+    const items = toArray(v);
+    const values = arg ? pluck(items, arg) : items;
+    const nums = values.map((n) => toNumber(n)).filter((n) => !Number.isNaN(n));
+    return nums.length === 0 ? null : Math.max(...nums);
+  },
+  first: (v) => (Array.isArray(v) ? (v.length > 0 ? v[0] : null) : v),
+  last: (v) => (Array.isArray(v) ? (v.length > 0 ? v[v.length - 1] : null) : v),
+  pluck: (v, arg) => (arg ? pluck(toArray(v), arg) : v),
+  slice: (v, arg) => {
+    const items = toArray(v);
+    const n = arg ? Number(arg) : 10;
+    return Number.isFinite(n) ? items.slice(0, n) : items;
+  },
+  reverse: (v) => (Array.isArray(v) ? [...v].reverse() : v),
+  sort: (v, arg) => {
+    if (!arg) {
+      return [...toArray(v)].sort((a, b) => {
+        const av = a as string | number;
+        const bv = b as string | number;
+        return av < bv ? -1 : av > bv ? 1 : 0;
+      });
+    }
+    const items = toArray<Record<string, unknown>>(v);
+    return [...items].sort((a, b) => {
+      const av = a?.[arg] as string | number | null | undefined;
+      const bv = b?.[arg] as string | number | null | undefined;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return av < bv ? -1 : av > bv ? 1 : 0;
+    });
+  },
+  not: (v) => !v,
+  empty: (v) => {
+    if (v == null || v === "" || v === 0 || v === false) return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === "object") return Object.keys(v as object).length === 0;
+    return false;
+  },
 };
 
 /* ------------------------------------------------------------------ *
@@ -134,6 +217,19 @@ function resolveValue(path: string, ctx: RuntimeContext): unknown {
   if (path === "state" || path.startsWith("state.")) {
     return getPath(ctx.state, path.slice("state.".length));
   }
+  if (path.startsWith("loading.")) {
+    return getPath(ctx.loading, path.slice("loading.".length));
+  }
+  // Scope (ForEach `item` / `as` variables) takes precedence over data so the
+  // template's references resolve to the current iteration's value first.
+  if (ctx.scope && Object.keys(ctx.scope).length > 0) {
+    const head = path.split(".")[0]!;
+    if (head in ctx.scope) {
+      const rest = path.slice(head.length).replace(/^\./, "");
+      const root = ctx.scope[head];
+      return rest === "" ? root : getPath(root, rest);
+    }
+  }
   const dataPath = path.startsWith("data.") ? path.slice("data.".length) : path;
   return getPath(ctx.data, dataPath);
 }
@@ -150,6 +246,15 @@ function applyFilters(
     current = fn(current, f.arg);
   }
   return current;
+}
+
+/**
+ * Public: evaluate a binding-style expression against a runtime context.
+ * Used by the renderer for the `when` prop and for any host-side checks
+ * that need the same semantics as `bindings: {...}`.
+ */
+export function evaluateBinding(expr: string, ctx: RuntimeContext): unknown {
+  return evalBinding(expr, ctx, builtinFilters);
 }
 
 /** Evaluate a binding expression to a typed value or interpolated string. */
@@ -216,6 +321,10 @@ export async function fetchDataSource(
   const fetcher = options.fetcher ?? fetch;
 
   if (source.kind === "static") return source.data;
+  if (source.kind === "ws") {
+    // WebSockets are managed by `useDataSources`; one-shot fetch doesn't apply.
+    return null;
+  }
 
   if (options.proxyUrl) {
     const res = await fetcher(options.proxyUrl, {
@@ -297,9 +406,42 @@ export function useDataSources(
   useEffect(() => {
     const current: Record<string, DataSource> = JSON.parse(sourcesKey);
     const timers: ReturnType<typeof setInterval>[] = [];
+    const sockets: WebSocket[] = [];
     for (const id of Object.keys(current)) {
       const source = current[id];
       if (!source) continue;
+      if (source.kind === "ws") {
+        if (typeof WebSocket === "undefined") continue;
+        try {
+          const ws = new WebSocket(source.url);
+          setLoading((prev) => ({ ...prev, [id]: true }));
+          ws.onopen = () => {
+            setLoading((prev) => ({ ...prev, [id]: false }));
+            if (source.onConnect !== undefined) {
+              const payload =
+                typeof source.onConnect === "string"
+                  ? source.onConnect
+                  : JSON.stringify(source.onConnect);
+              ws.send(payload);
+            }
+          };
+          ws.onmessage = (event) => {
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(String(event.data));
+            } catch {
+              parsed = event.data;
+            }
+            setData((prev) => ({ ...prev, [id]: selectPath(parsed, source.select) }));
+          };
+          ws.onerror = () => setLoading((prev) => ({ ...prev, [id]: false }));
+          ws.onclose = () => setLoading((prev) => ({ ...prev, [id]: false }));
+          sockets.push(ws);
+        } catch {
+          setLoading((prev) => ({ ...prev, [id]: false }));
+        }
+        continue;
+      }
       load(id, source);
       if (source.kind === "rest" && source.pollMs) {
         timers.push(setInterval(() => load(id, source), source.pollMs));
@@ -307,6 +449,13 @@ export function useDataSources(
     }
     return () => {
       for (const timer of timers) clearInterval(timer);
+      for (const ws of sockets) {
+        try {
+          ws.close();
+        } catch {
+          // ignore
+        }
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcesKey, load]);

@@ -157,6 +157,8 @@ export const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("openUrl"), url: z.string(), newTab: z.boolean().optional() }),
   z.object({ type: z.literal("scrollTo"), nodeId: z.string() }),
   z.object({ type: z.literal("emitEvent"), name: z.string(), payload: jsonValueSchema.optional() }),
+  /** Navigate to a screen key (sets state.currentScreen). */
+  z.object({ type: z.literal("navigate"), to: z.string() }),
 ]);
 export type Action = z.infer<typeof actionSchema>;
 
@@ -178,6 +180,12 @@ export interface UINode {
   motion?: MotionSpec;
   events?: EventMap;
   children?: UINode[];
+  /**
+   * Optional binding expression. When set, the renderer evaluates it against
+   * the runtime context; falsy values cause the node (and its subtree) to be
+   * skipped. E.g. `"{{state.detailsOpen}}"` or `"{{data.user.role}}"`.
+   */
+  when?: string;
 }
 
 export const uiNodeSchema: z.ZodType<UINode> = z.lazy(() =>
@@ -190,6 +198,7 @@ export const uiNodeSchema: z.ZodType<UINode> = z.lazy(() =>
     motion: motionSpecSchema.optional(),
     events: eventMapSchema.optional(),
     children: z.array(uiNodeSchema).optional(),
+    when: z.string().optional(),
   }),
 );
 
@@ -239,6 +248,16 @@ export const dataSourceSchema = z.discriminatedUnion("kind", [
     /** If set, re-fetch on this interval (ms). */
     pollMs: z.number().int().positive().optional(),
   }),
+  z.object({
+    kind: z.literal("ws"),
+    id: z.string().min(1),
+    /** ws:// or wss:// endpoint */
+    url: z.string().url(),
+    /** Optional dot-path into each received message before storing. */
+    select: z.string().optional(),
+    /** Optional initial message sent on connect (string/JSON). */
+    onConnect: jsonValueSchema.optional(),
+  }),
 ]);
 export type DataSource = z.infer<typeof dataSourceSchema>;
 
@@ -275,6 +294,12 @@ export const dashboardSchema = z.object({
   dataSources: z.record(dataSourceSchema).default({}),
   /** Client-side reactive state (filters, toggles, form values, ...). */
   state: z.record(jsonValueSchema).default({}),
+  /**
+   * Alternate root trees keyed by screen name (e.g. "settings", "details").
+   * The renderer picks `screens[state.currentScreen]` when present, else
+   * falls back to `root`. Use the `navigate` action to switch screens.
+   */
+  screens: z.record(uiNodeSchema).optional(),
 });
 export type Dashboard = z.infer<typeof dashboardSchema>;
 
@@ -380,6 +405,7 @@ export function emptyDashboard(id = "dashboard"): Dashboard {
     components: {},
     dataSources: {},
     state: {},
+    screens: undefined,
   };
 }
 

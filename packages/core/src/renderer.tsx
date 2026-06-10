@@ -6,9 +6,15 @@ import { EASE_EXIT, EASE_OUT, ENTRANCE_DURATION, STAGGER_MS } from "./_easing";
 import { useShallowMemo } from "./_shallow";
 import { NodeErrorBoundary } from "./components/error-boundary";
 import type { ComponentRegistry } from "./components/types";
+import { evaluateBinding } from "./data";
 import { defaultExtensions } from "./extensions";
 import { defaultRegistry } from "./registry";
-import { noopExtensions, type RendererExtensions, type RuntimeContext } from "./runtime";
+import {
+  noopExtensions,
+  withScope,
+  type RendererExtensions,
+  type RuntimeContext,
+} from "./runtime";
 import { RuntimeReactContext, useRuntimeContext } from "./runtime-context";
 import type { Dashboard, UINode } from "./schema";
 import { cn } from "./utils";
@@ -61,6 +67,7 @@ const DEFAULT_SPAN: Record<string, number> = {
   CodeBlock: 12,
   Quote: 12,
   Kbd: 2,
+  ForEach: 12,
 };
 
 /** The grid-span wrapper class is structural and owned by the renderer. */
@@ -112,7 +119,22 @@ function RenderNode({
   isRoot,
   siblingIndex = 0,
 }: RenderNodeProps) {
-  const node = resolve(rawNode, ext, ctx);
+  // Iteration scope: ForEach expansion writes `_scope` into the cloned
+  // child's props; push it into ctx before binding resolution + render.
+  const scopeProp = rawNode.props?._scope;
+  const scopedCtx =
+    scopeProp && typeof scopeProp === "object" && !Array.isArray(scopeProp)
+      ? withScope(ctx, scopeProp as Record<string, unknown>)
+      : ctx;
+
+  const node = resolve(rawNode, ext, scopedCtx);
+
+  // `when` gate — evaluate against the same scope. Falsy → render nothing.
+  if (node.when !== undefined && node.when !== "") {
+    const visible = evaluateBinding(node.when, scopedCtx);
+    if (!visible) return null;
+  }
+
   const Comp = registry[node.type];
 
   const renderedChildren =
@@ -124,7 +146,7 @@ function RenderNode({
             node={child}
             registry={registry}
             ext={ext}
-            ctx={ctx}
+            ctx={scopedCtx}
             siblingIndex={i}
           />
         ))}
@@ -144,7 +166,7 @@ function RenderNode({
 
   const compiledStyle = node.style ? ext.compileStyle(node.style, node) : {};
   const compiledMotion = node.motion ? ext.compileMotion(node.motion) : {};
-  const handlers = node.events ? ext.compileEvents(node.events, ctx) : {};
+  const handlers = node.events ? ext.compileEvents(node.events, scopedCtx) : {};
 
   return (
     <motion.div
@@ -184,8 +206,8 @@ export interface DashboardRendererProps {
    * omitted, `extensions` is layered over `defaultExtensions`.
    */
   baseExtensions?: RendererExtensions;
-  /** Resolved data, live state, and dispatch from the data/action layer. */
-  context?: Partial<Pick<RuntimeContext, "data" | "dispatch" | "state">>;
+  /** Resolved data, live state, dispatch, and per-source loading flags. */
+  context?: Partial<Pick<RuntimeContext, "data" | "dispatch" | "state" | "loading">>;
   className?: string;
 }
 
@@ -221,10 +243,21 @@ export function DashboardRenderer({
       dashboard,
       data: stableCtxIn?.data ?? {},
       state: stableCtxIn?.state ?? dashboard.state ?? {},
+      loading: stableCtxIn?.loading ?? {},
+      scope: {},
       dispatch: stableCtxIn?.dispatch ?? (() => {}),
     }),
     [dashboard, stableCtxIn],
   );
+
+  // Routing: pick a screen if state.currentScreen names one, else the root.
+  const activeRoot: UINode = useMemo(() => {
+    const screenKey = ctx.state?.currentScreen;
+    if (typeof screenKey === "string" && dashboard.screens?.[screenKey]) {
+      return dashboard.screens[screenKey]!;
+    }
+    return dashboard.root;
+  }, [ctx.state?.currentScreen, dashboard.root, dashboard.screens]);
 
   return (
     <RuntimeReactContext.Provider value={ctx}>
@@ -234,7 +267,7 @@ export function DashboardRenderer({
             {dashboard.title}
           </motion.h1>
         )}
-        <RenderNode node={dashboard.root} registry={registry} ext={ext} ctx={ctx} isRoot />
+        <RenderNode node={activeRoot} registry={registry} ext={ext} ctx={ctx} isRoot />
       </div>
     </RuntimeReactContext.Provider>
   );

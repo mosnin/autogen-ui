@@ -48,6 +48,7 @@ export {
 export { applyPatch, applyPatches, findNode, validatePatchTargets } from "./patch";
 export {
   noopExtensions,
+  withScope,
   type CompiledStyle,
   type RendererExtensions,
   type RuntimeContext,
@@ -97,6 +98,7 @@ export {
 // Phase 4 — dynamic data + declarative actions
 export {
   builtinFilters,
+  evaluateBinding,
   fetchDataSource,
   getPath,
   resolveBindings,
@@ -107,6 +109,7 @@ export {
   type UseDataSourcesOptions,
   type UseDataSourcesResult,
 } from "./data";
+export { expandForEach } from "./_foreach";
 export { createDataProxyHandler, type DataProxyOptions } from "./proxy";
 export {
   compileEvents,

@@ -14,6 +14,13 @@ export interface RuntimeContext {
   data: Record<string, unknown>;
   /** Live reactive state (filters, toggles, form values). */
   state: Record<string, unknown>;
+  /** Per-source loading flags (`loading.id` in bindings + `when`). */
+  loading: Record<string, boolean>;
+  /**
+   * Per-node iteration scope. ForEach expansion writes `{ <as>: item, [<as>+"Index"]: i }`
+   * into a fresh scope; the binding resolver checks here before `data`/`state`.
+   */
+  scope: Record<string, unknown>;
   /** Run a declarative action list (filled by the action layer). */
   dispatch: (actions: Action[], eventPayload?: Record<string, unknown>) => void;
 }
@@ -49,3 +56,11 @@ export const noopExtensions: Required<RendererExtensions> = {
   resolveNode: (node) => node,
   compileEvents: () => ({}),
 };
+
+/** Build a child `RuntimeContext` by stacking a fresh scope on top. */
+export function withScope(
+  parent: RuntimeContext,
+  scope: Record<string, unknown>,
+): RuntimeContext {
+  return { ...parent, scope: { ...parent.scope, ...scope } };
+}

@@ -1,6 +1,7 @@
 import { compileEvents } from "./actions";
 import { resolveBindings } from "./data";
 import { instantiateComponent } from "./define";
+import { expandForEach } from "./_foreach";
 import { compileMotion } from "./motion";
 import type { RendererExtensions, RuntimeContext } from "./runtime";
 import type { UINode } from "./schema";
@@ -16,7 +17,10 @@ import { compileStyle } from "./style";
  * resolve loop terminates.
  */
 function resolveNode(node: UINode, ctx: RuntimeContext): UINode {
-  return resolveBindings(instantiateComponent(node, ctx), ctx);
+  return resolveBindings(
+    expandForEach(instantiateComponent(node, ctx), ctx),
+    ctx,
+  );
 }
 
 export const defaultExtensions: RendererExtensions = {
