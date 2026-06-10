@@ -1617,6 +1617,102 @@ function test(name: string, ok: boolean, detail = "") {
   }
 }
 
+// ---------- 32. ComponentAdapter renames agent props to host props.
+{
+  process.stdout.write("\n# component adapter\n");
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { createComponentAdapter, mapComponent } = await import("../src/adapter");
+
+  interface HostProps {
+    heading?: string;
+    subhead?: string;
+    badge?: string;
+    children?: import("react").ReactNode;
+  }
+  const HostCard = (p: HostProps) =>
+    createElement(
+      "section",
+      { className: "host-card", "data-badge": p.badge ?? "" },
+      createElement("h3", null, p.heading ?? ""),
+      createElement("p", null, p.subhead ?? ""),
+      p.children,
+    );
+
+  const Adapted = createComponentAdapter<HostProps>({
+    Component: HostCard,
+    mapProps: { title: "heading", description: "subhead" },
+    defaults: { badge: "new" },
+    computeProps: (agent) => ({
+      heading: typeof agent.title === "string" ? agent.title.toUpperCase() : undefined,
+    }),
+  });
+  const html = renderToStaticMarkup(
+    createElement(Adapted, { title: "Sales", description: "Q4 view" } as never),
+  );
+  test("mapped prop reaches host", /<h3>SALES<\/h3>/.test(html));
+  test("description renamed to subhead", /<p>Q4 view<\/p>/.test(html));
+  test("default carried through", /data-badge="new"/.test(html));
+
+  // Shortcut helper.
+  const Renamed = mapComponent(HostCard, { title: "heading" });
+  const html2 = renderToStaticMarkup(createElement(Renamed, { title: "OK" } as never));
+  test("mapComponent shortcut works", /<h3>OK<\/h3>/.test(html2));
+}
+
+// ---------- 33. Inline style compiler for non-Tailwind hosts.
+{
+  process.stdout.write("\n# inline style compiler\n");
+  const { createInlineStyleCompiler } = await import("../src/style-adapters");
+  const compile = createInlineStyleCompiler();
+  const out = compile(
+    { p: 4, bg: "primary", rounded: "lg", fontSize: "lg" },
+    { id: "n", type: "Box" },
+  );
+  test("emits style only (no className)", out.className === undefined && !!out.style);
+  test("padding mapped to rem", out.style?.padding === "1rem");
+  test(
+    "bg uses CSS var",
+    out.style?.backgroundColor === "hsl(var(--primary))",
+  );
+  test("rounded resolves to var", String(out.style?.borderRadius).includes("--radius"));
+  test("fontSize mapped", out.style?.fontSize === "1.125rem");
+
+  // Opacity
+  const op = compile({ opacity: 50 }, { id: "n", type: "Box" });
+  test("opacity scaled 0..1", op.style?.opacity === 0.5);
+
+  // Empty spec returns empty
+  const empty = compile({}, { id: "n", type: "Box" });
+  test("empty spec returns empty", empty.style === undefined && empty.className === undefined);
+}
+
+// ---------- 34. onTurn telemetry fires with patch + warning counts.
+{
+  process.stdout.write("\n# agent telemetry\n");
+  const captured: import("../src/agent").TurnInfo[] = [];
+  const fake = createFakeClient([
+    {
+      message: "Built it.",
+      patches: [
+        { op: "append", parentId: "root", node: { id: "a", type: "Stat", props: { label: "x", value: 1 } } },
+        { op: "append", parentId: "root", node: { id: "b", type: "Stat", props: { label: "y", value: 2 } } },
+      ],
+    },
+  ]);
+  const agent = createUIAgent({
+    client: fake,
+    onTurn: (info) => captured.push(info),
+  });
+  await agent.run({ messages: [{ role: "user", content: "hi" }] });
+  test("onTurn fired once", captured.length === 1);
+  test("clientName captured", captured[0]?.clientName === "fake");
+  test("patchCount correct", captured[0]?.patchCount === 2);
+  test("attempts === 1 on happy path", captured[0]?.attempts === 1);
+  test("durationMs is a number", typeof captured[0]?.durationMs === "number");
+  test("hadRepair false on happy path", captured[0]?.hadRepair === false);
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

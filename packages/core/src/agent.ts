@@ -28,6 +28,18 @@ export interface UIAgent {
   run(request: AgentRequest): Promise<AgentResponse>;
 }
 
+/** Telemetry payload emitted at the end of every agent turn. */
+export interface TurnInfo {
+  clientName: string;
+  attempts: number;
+  durationMs: number;
+  patchCount: number;
+  warningCount: number;
+  hadRepair: boolean;
+  /** Trimmed last error message if the turn fell over before resolving. */
+  error?: string;
+}
+
 export interface CreateUIAgentOptions {
   client: LLMClient;
   /** Capability modules whose prompt sections are appended, in order. */
@@ -50,6 +62,8 @@ export interface CreateUIAgentOptions {
    * feed the error back and retry up to this many times. Default 2.
    */
   maxRepairAttempts?: number;
+  /** Fires after each completed turn — for logging, metrics, observability. */
+  onTurn?: (info: TurnInfo) => void;
   /**
    * When true, treat patch-target warnings (hallucinated id references) the
    * same as a Zod failure: feed them back to the model and retry, up to
@@ -184,6 +198,7 @@ interface RunArgs {
   dashboard: Dashboard;
   maxRepairAttempts: number;
   repairOnWarnings: boolean;
+  onTurn?: (info: TurnInfo) => void;
 }
 
 async function runWithRepair({
@@ -193,8 +208,27 @@ async function runWithRepair({
   dashboard,
   maxRepairAttempts,
   repairOnWarnings,
+  onTurn,
 }: RunArgs): Promise<AgentResponse> {
+  const startedAt = Date.now();
   let messages = initialMessages;
+  let lastError: string | undefined;
+  const emit = (result: AgentResponse | null, attempts: number) => {
+    if (!onTurn) return;
+    try {
+      onTurn({
+        clientName: client.name,
+        attempts,
+        durationMs: Date.now() - startedAt,
+        patchCount: result?.patches.length ?? 0,
+        warningCount: result?.warnings?.length ?? 0,
+        hadRepair: attempts > 1,
+        error: lastError,
+      });
+    } catch {
+      // never let telemetry crash the run
+    }
+  };
 
   for (let attempt = 0; attempt <= maxRepairAttempts; attempt++) {
     const result = await client.complete({
@@ -206,6 +240,8 @@ async function runWithRepair({
 
     const call = result.toolCalls.find((c) => c.name === EMIT_PATCHES_TOOL.name);
     if (!call) {
+      lastError = `${client.name} did not call emit_patches`;
+      emit(null, attempt + 1);
       throw new Error(
         `[autogen-ui] ${client.name} did not call emit_patches. text="${result.text.slice(0, 200)}"`,
       );
@@ -214,9 +250,14 @@ async function runWithRepair({
     const parsed = agentResponseSchema.safeParse(call.input);
     if (parsed.success) {
       const warnings = validatePatchTargets(dashboard, parsed.data.patches);
-      if (warnings.length === 0) return parsed.data;
+      if (warnings.length === 0) {
+        emit(parsed.data, attempt + 1);
+        return parsed.data;
+      }
       if (!repairOnWarnings || attempt >= maxRepairAttempts) {
-        return { ...parsed.data, warnings };
+        const out = { ...parsed.data, warnings };
+        emit(out, attempt + 1);
+        return out;
       }
       messages = [
         ...messages,
@@ -233,6 +274,8 @@ async function runWithRepair({
     }
 
     if (attempt >= maxRepairAttempts) {
+      lastError = describeZodError(parsed.error);
+      emit(null, attempt + 1);
       throw new Error(
         `[autogen-ui] emit_patches input failed validation after ${attempt + 1} attempts:\n${describeZodError(parsed.error)}`,
       );
@@ -266,6 +309,7 @@ export function createUIAgent({
   brand,
   maxRepairAttempts = 2,
   repairOnWarnings = false,
+  onTurn,
 }: CreateUIAgentOptions): UIAgent {
   const system = buildSystemSegments({ capabilities, components, instructions, brand });
 
@@ -281,6 +325,7 @@ export function createUIAgent({
         dashboard,
         maxRepairAttempts,
         repairOnWarnings,
+        onTurn,
       });
     },
   };

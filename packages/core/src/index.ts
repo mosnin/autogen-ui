@@ -97,6 +97,17 @@ export {
   type BrandKit,
 } from "./brand";
 export { BrandProvider, useBrand, type BrandProviderProps } from "./brand-provider";
+
+// Host integration — component adapters + alternate style compilers.
+export {
+  createComponentAdapter,
+  mapComponent,
+  type ComponentAdapterOptions,
+} from "./adapter";
+export {
+  createInlineStyleCompiler,
+  type InlineStyleCompilerOptions,
+} from "./style-adapters";
 export {
   brandPresets,
   forestKit,
@@ -186,6 +197,7 @@ export {
   type LLMSystemSegment,
   type LLMTool,
   type ToolCall,
+  type TurnInfo,
   type UIAgent,
 } from "./agent";
 export { systemToSegments, systemToString } from "./llm";

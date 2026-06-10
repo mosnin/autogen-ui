@@ -89,6 +89,7 @@ export {
   type LLMSystemSegment,
   type LLMTool,
   type ToolCall,
+  type TurnInfo,
   type UIAgent,
 } from "./agent";
 export { systemToSegments, systemToString } from "./llm";
