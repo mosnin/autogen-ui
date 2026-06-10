@@ -36,7 +36,7 @@ export const violetKit: BrandKit = {
     border: "240 8% 14%",
   },
   radius: "lg",
-  typography: { sans: "Geist", display: "Geist" },
+  typography: { sans: "Inter", display: "Inter" },
   voice: { tone: "restrained, editorial, confident in silence" },
 };
 
