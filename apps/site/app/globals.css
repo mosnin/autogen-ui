@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "@autogen-ui/core/styles.css";
+
+html, body {
+  height: 100%;
+}
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
+}
+
+/* Atmospheric backdrop — a soft radial that follows the viewport. */
+.aurora {
+  background:
+    radial-gradient(60% 50% at 15% 0%, hsl(var(--primary) / 0.18), transparent 60%),
+    radial-gradient(50% 40% at 90% 10%, hsl(var(--chart-2) / 0.10), transparent 60%);
+}
+
+/* The streaming caret used in the hero. */
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.blink-cursor { animation: blink-cursor 0.85s linear infinite; }
+
+/* Subtle grid lines for the components catalog section. */
+.fine-grid {
+  background-image:
+    linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, black, transparent 80%);
+}
