@@ -1783,6 +1783,118 @@ function test(name: string, ok: boolean, detail = "") {
   test("current-version input parses cleanly", same.version === SPEC_VERSION);
 }
 
+// ---------- 37. navigate pushes screen history; navigateBack pops it.
+{
+  process.stdout.write("\n# screen history\n");
+  const { createDispatcher } = await import("../src/actions");
+  let stateMap: Record<string, unknown> = {};
+  const setState = (path: string, value: unknown) => {
+    stateMap = { ...stateMap, [path]: value };
+  };
+  const dispatch = createDispatcher({
+    getState: () => stateMap,
+    setState,
+    refetch: () => {},
+  });
+  // Start at "home"
+  stateMap = { currentScreen: "home" };
+  dispatch([{ type: "navigate", to: "details" }]);
+  test("navigate pushed previous to history", JSON.stringify(stateMap.screenHistory) === '["home"]');
+  test("navigate set new currentScreen", stateMap.currentScreen === "details");
+  dispatch([{ type: "navigate", to: "edit" }]);
+  test("history grows on subsequent navigate", JSON.stringify(stateMap.screenHistory) === '["home","details"]');
+  dispatch([{ type: "navigateBack" }]);
+  test("navigateBack returned to previous", stateMap.currentScreen === "details");
+  test("history shrunk", JSON.stringify(stateMap.screenHistory) === '["home"]');
+  dispatch([{ type: "navigateBack" }]);
+  dispatch([{ type: "navigateBack" }]); // no-op
+  test("navigateBack at root is a no-op", stateMap.currentScreen === "home");
+}
+
+// ---------- 38. Server persistence handler round-trips a dashboard.
+{
+  process.stdout.write("\n# persistence handler\n");
+  const { createPersistenceHandler, createMemoryStore } = await import(
+    "../src/persistence-handler"
+  );
+  const handler = createPersistenceHandler({ store: createMemoryStore() });
+  const d = emptyDashboard("saved-1");
+  const setRes = await handler(
+    new Request("http://x/persist", {
+      method: "POST",
+      body: JSON.stringify({ id: "saved-1", dashboard: d }),
+    }),
+  );
+  test("POST returns ok", setRes.status === 200);
+  const getRes = await handler(
+    new Request("http://x/persist?id=saved-1", { method: "GET" }),
+  );
+  test("GET returns 200", getRes.status === 200);
+  const wrapped = (await getRes.json()) as { dashboard: { id: string } };
+  test("loaded dashboard round-trips id", wrapped.dashboard?.id === "saved-1");
+  // 404 for missing
+  const missing = await handler(
+    new Request("http://x/persist?id=nope", { method: "GET" }),
+  );
+  test("GET missing returns 404", missing.status === 404);
+  // list
+  const list = await handler(
+    new Request("http://x/persist?list=1", { method: "GET" }),
+  );
+  const listWrapped = (await list.json()) as { ids: string[] };
+  test("list returns ids", listWrapped.ids?.[0] === "saved-1");
+  // delete
+  const del = await handler(
+    new Request("http://x/persist?id=saved-1", { method: "DELETE" }),
+  );
+  test("DELETE returns ok", del.status === 200);
+  const afterDelete = await handler(
+    new Request("http://x/persist?id=saved-1", { method: "GET" }),
+  );
+  test("GET after delete returns 404", afterDelete.status === 404);
+  // authorize gate
+  const guarded = createPersistenceHandler({
+    store: createMemoryStore(),
+    authorize: (_req, op) => op.kind === "get",
+  });
+  const denied = await guarded(
+    new Request("http://x/persist", {
+      method: "POST",
+      body: JSON.stringify({ id: "x", dashboard: emptyDashboard("x") }),
+    }),
+  );
+  test("authorize=false rejects with 401", denied.status === 401);
+}
+
+// ---------- 39. Persistence handler migrates older dashboard payloads.
+{
+  process.stdout.write("\n# persistence migrates input\n");
+  const { createPersistenceHandler, createMemoryStore } = await import(
+    "../src/persistence-handler"
+  );
+  const store = createMemoryStore();
+  const handler = createPersistenceHandler({ store });
+  // v1 payload, no `functions` etc.
+  const v1 = {
+    version: 1,
+    id: "legacy",
+    root: { id: "root", type: "Grid", children: [] },
+    components: {},
+    dataSources: {},
+    state: {},
+  };
+  const res = await handler(
+    new Request("http://x/persist", {
+      method: "POST",
+      body: JSON.stringify({ id: "legacy", dashboard: v1 }),
+    }),
+  );
+  test("v1 input accepted", res.status === 200);
+  const loaded = await store.get("legacy");
+  test("v1 stored at current version", loaded?.version === 2);
+  test("functions populated by migration", loaded?.functions !== undefined);
+}
+
 // ---------- Summary
 process.stdout.write(`\n${pass} passed, ${fail} failed\n`);
 if (fail > 0) {

@@ -1,12 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef } from "react";
 import { useRuntimeContext } from "../runtime-context";
 import type { Action, EventMap } from "../schema";
 import { cn } from "../utils";
 import { bool, oneOf, str } from "./helpers";
 import type { ComponentRegistry, RegistryComponent } from "./types";
 import type { ComponentDoc } from "../registry";
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function getActions(events: EventMap | undefined, name: string): Action[] {
   const list = events?.[name];
@@ -21,10 +25,62 @@ export const Modal: RegistryComponent = ({ node, open, title, children }) => {
   const { dispatch } = useRuntimeContext();
   const isOpen = bool(open, false);
   const onClose = getActions(node?.events, "onClose");
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   const fireClose = () => {
     if (onClose.length > 0) dispatch(onClose, {});
   };
+
+  // Capture the previously-focused element when opening, restore on close.
+  useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current =
+      typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null;
+    // Move focus into the dialog after the entrance animation has settled.
+    const t = setTimeout(() => {
+      const dlg = dialogRef.current;
+      if (!dlg) return;
+      const focusable = dlg.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (focusable ?? dlg).focus();
+    }, 30);
+    return () => {
+      clearTimeout(t);
+      previousFocusRef.current?.focus?.();
+    };
+  }, [isOpen]);
+
+  // Esc + Tab focus trap while open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        fireClose();
+        return;
+      }
+      if (event.key === "Tab") {
+        const dlg = dialogRef.current;
+        if (!dlg) return;
+        const focusables = Array.from(dlg.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+        if (focusables.length === 0) return;
+        const first = focusables[0]!;
+        const last = focusables[focusables.length - 1]!;
+        const active = document.activeElement as HTMLElement | null;
+        if (event.shiftKey && active === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && active === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+    // fireClose is stable across renders for our purposes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   return (
     <AnimatePresence>
@@ -43,11 +99,14 @@ export const Modal: RegistryComponent = ({ node, open, title, children }) => {
             aria-hidden="true"
           />
           <motion.div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={str(title) ? "modal-title" : undefined}
+            tabIndex={-1}
             className={cn(
               "relative z-10 w-full max-w-lg rounded-xl border border-border bg-card text-card-foreground shadow-xl",
-              "p-5 flex flex-col gap-3",
+              "p-5 flex flex-col gap-3 outline-none",
             )}
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -56,7 +115,9 @@ export const Modal: RegistryComponent = ({ node, open, title, children }) => {
           >
             <div className="flex items-start justify-between gap-3">
               {str(title) ? (
-                <h3 className="font-semibold leading-none tracking-tight">{str(title)}</h3>
+                <h3 id="modal-title" className="font-semibold leading-none tracking-tight">
+                  {str(title)}
+                </h3>
               ) : (
                 <span />
               )}

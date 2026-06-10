@@ -157,8 +157,10 @@ export const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("openUrl"), url: z.string(), newTab: z.boolean().optional() }),
   z.object({ type: z.literal("scrollTo"), nodeId: z.string() }),
   z.object({ type: z.literal("emitEvent"), name: z.string(), payload: jsonValueSchema.optional() }),
-  /** Navigate to a screen key (sets state.currentScreen). */
+  /** Navigate to a screen key (sets state.currentScreen, pushes history). */
   z.object({ type: z.literal("navigate"), to: z.string() }),
+  /** Pop the most recent screen off state.screenHistory and return there. */
+  z.object({ type: z.literal("navigateBack") }),
   /**
    * Call an agent-defined function. Resolves args against the live context,
    * fires the function (HTTP), and on resolution dispatches `onSuccess` /

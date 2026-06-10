@@ -102,6 +102,14 @@ export {
 export { createStreamingRouteHandler } from "./createStreamRouteHandler";
 export { encodeFrame, framesToResponse, readFrames } from "./stream";
 
+// Server-side persistence — Web Request handler for save/load.
+export {
+  createMemoryStore,
+  createPersistenceHandler,
+  type PersistenceHandlerOptions,
+  type PersistenceStore,
+} from "./persistence-handler";
+
 // Capabilities (plain data — system-prompt modules)
 export {
   defaultCapabilities,

@@ -140,9 +140,29 @@ export function createDispatcher(args: CreateDispatcherArgs) {
         case "emitEvent":
           onEvent?.(action.name, action.payload ?? null);
           break;
-        case "navigate":
+        case "navigate": {
+          const state = getState();
+          const history = Array.isArray(state.screenHistory)
+            ? (state.screenHistory as unknown[])
+            : [];
+          const current = state.currentScreen;
+          if (typeof current === "string" && current !== action.to) {
+            setState("screenHistory", [...history, current]);
+          }
           setState("currentScreen", action.to);
           break;
+        }
+        case "navigateBack": {
+          const state = getState();
+          const history = Array.isArray(state.screenHistory)
+            ? (state.screenHistory as unknown[])
+            : [];
+          if (history.length === 0) break;
+          const previous = history[history.length - 1];
+          setState("screenHistory", history.slice(0, -1));
+          setState("currentScreen", previous);
+          break;
+        }
         case "callFunction":
           callFunction?.(
             action.name,

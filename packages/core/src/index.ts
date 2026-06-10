@@ -170,6 +170,14 @@ export {
   type UseStreamingDashboardResult,
 } from "./hooks/useStreamingDashboard";
 
+// Server-side persistence — Web Request handler for save/load.
+export {
+  createMemoryStore,
+  createPersistenceHandler,
+  type PersistenceHandlerOptions,
+  type PersistenceStore,
+} from "./persistence-handler";
+
 // Capabilities (system-prompt modules)
 export {
   defaultCapabilities,
