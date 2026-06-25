@@ -78,6 +78,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx scripts/run-eval.ts",
     "smoke:llm": "tsx scripts/real-llm-smoke.ts",
+    "probe:llm": "tsx scripts/quality-probe.ts",
     "example:node": "tsx scripts/node-server-example.ts",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
