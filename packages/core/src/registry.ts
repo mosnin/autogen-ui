@@ -6,6 +6,7 @@ import { Modal, Tooltip } from "./components/overlays";
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Chart,
   Divider,
@@ -16,8 +17,10 @@ import {
   Section,
   Stack,
   Stat,
+  Stepper,
   Table,
   Text,
+  Timeline,
 } from "./components/primitives";
 import type { ComponentRegistry } from "./components/types";
 
@@ -272,6 +275,24 @@ export const componentCatalog: ComponentDoc[] = [
     props: "keys: string",
     acceptsChildren: false,
   },
+  {
+    type: "Timeline",
+    description: "Vertical timeline with status-coded steps (done/current/pending). items prop is an array of {id, title, description?, timestamp?, status}.",
+    props: "items: Array<{id, title, description?, timestamp?, status: 'done'|'current'|'pending'}>",
+    acceptsChildren: false,
+  },
+  {
+    type: "Callout",
+    description: "Alert/callout box with colored left border. Use for info, warnings, errors, and success messages.",
+    props: "variant: 'info'|'warning'|'success'|'error', title?: string, content?: string",
+    acceptsChildren: true,
+  },
+  {
+    type: "Stepper",
+    description: "Horizontal step progress indicator with connecting track. Steps can be done/active/pending.",
+    props: "steps: string[], current: number (0-indexed active step)",
+    acceptsChildren: false,
+  },
 ];
 
 /** Built-in component registry mapping spec `type` -> React component. */
@@ -314,6 +335,9 @@ export const defaultRegistry: ComponentRegistry = {
   CodeBlock,
   Quote,
   Kbd,
+  Timeline,
+  Callout,
+  Stepper,
 };
 
 /** Merge custom components onto the defaults. Custom entries win on conflict. */

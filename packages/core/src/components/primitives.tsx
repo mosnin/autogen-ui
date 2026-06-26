@@ -339,6 +339,206 @@ export const Button: RegistryComponent = ({ label, variant, disabled, ariaLabel 
 
 export const Divider: RegistryComponent = () => <hr className="border-border" />;
 
+/* ------------------------------------------------------------------ *
+ * Timeline
+ * ------------------------------------------------------------------ */
+
+export const Timeline: RegistryComponent = ({ items, children }) => {
+  const safeItems = Array.isArray(items) ? items : [];
+  return (
+    <div className="relative flex flex-col gap-0">
+      {safeItems.map((item, i) => {
+        const isDone = item.status === "done";
+        const isCurrent = item.status === "current";
+        const isLast = i === safeItems.length - 1;
+        return (
+          <div key={item.id ?? i} className="flex gap-4">
+            {/* Timeline rail */}
+            <div className="flex flex-col items-center">
+              <div
+                className={cn(
+                  "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold",
+                  isDone
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : isCurrent
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background text-muted-foreground",
+                )}
+              >
+                {isDone ? (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                  </svg>
+                ) : (
+                  <span>{i + 1}</span>
+                )}
+              </div>
+              {!isLast && (
+                <div
+                  className={cn(
+                    "mt-1 w-0.5 grow",
+                    isDone ? "bg-primary" : "bg-border",
+                  )}
+                />
+              )}
+            </div>
+            {/* Content */}
+            <div className={cn("flex flex-col gap-1 pb-6", isLast && "pb-0")}>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "text-sm font-semibold",
+                    isCurrent ? "text-primary" : "text-foreground",
+                  )}
+                >
+                  {item.title}
+                </span>
+                {item.timestamp && (
+                  <span className="text-xs text-muted-foreground">{item.timestamp}</span>
+                )}
+              </div>
+              {item.description && (
+                <p className="text-sm text-muted-foreground">{item.description}</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      {children}
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ *
+ * Callout
+ * ------------------------------------------------------------------ */
+
+const CALLOUT_STYLES = {
+  info: {
+    border: "border-l-4 border-primary",
+    bg: "bg-primary/5",
+    icon: "text-primary",
+    title: "text-primary",
+  },
+  warning: {
+    border: "border-l-4 border-[hsl(var(--warning))]",
+    bg: "bg-[hsl(var(--warning)/0.08)]",
+    icon: "text-[hsl(var(--warning))]",
+    title: "text-[hsl(var(--warning))]",
+  },
+  success: {
+    border: "border-l-4 border-[hsl(var(--success))]",
+    bg: "bg-[hsl(var(--success)/0.08)]",
+    icon: "text-[hsl(var(--success))]",
+    title: "text-[hsl(var(--success))]",
+  },
+  error: {
+    border: "border-l-4 border-[hsl(var(--danger))]",
+    bg: "bg-[hsl(var(--danger)/0.08)]",
+    icon: "text-[hsl(var(--danger))]",
+    title: "text-[hsl(var(--danger))]",
+  },
+} as const;
+
+const CALLOUT_ICONS = {
+  info: (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 3.5c-.69 0-1.25.56-1.25 1.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C9.25 8.06 8.69 7.5 8 7.5Z" />
+    </svg>
+  ),
+  warning: (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" />
+    </svg>
+  ),
+  success: (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm3.78 5.22a.75.75 0 0 0-1.06 0L7 8.94 5.28 7.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.06 0l4.25-4.25a.75.75 0 0 0 0-1.06Z" />
+    </svg>
+  ),
+  error: (
+    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M2.343 13.657A8 8 0 1 1 13.656 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.75.75 0 0 0-1.06 1.06L6.94 8 4.97 9.97a.75.75 0 1 0 1.06 1.06L8 9.06l1.97 1.97a.75.75 0 1 0 1.06-1.06L9.06 8l1.97-1.97a.75.75 0 1 0-1.06-1.06L8 6.94 6.03 4.97Z" />
+    </svg>
+  ),
+};
+
+export const Callout: RegistryComponent = ({ variant = "info", title, content, children }) => {
+  const safeVariant = (variant as string) in CALLOUT_STYLES ? (variant as keyof typeof CALLOUT_STYLES) : "info";
+  const styles = CALLOUT_STYLES[safeVariant];
+  const titleText = str(title);
+  const contentText = str(content);
+  return (
+    <div className={cn("flex gap-3 rounded-r-lg p-4", styles.border, styles.bg)}>
+      <div className={styles.icon}>{CALLOUT_ICONS[safeVariant]}</div>
+      <div className="flex flex-col gap-1">
+        {titleText && <p className={cn("text-sm font-semibold", styles.title)}>{titleText}</p>}
+        {contentText && <p className="text-sm text-foreground/80">{contentText}</p>}
+        {children}
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ *
+ * Stepper
+ * ------------------------------------------------------------------ */
+
+export const Stepper: RegistryComponent = ({ steps, current = 0, children }) => {
+  const safeSteps = Array.isArray(steps) ? steps : [];
+  const safeCurrentRaw = typeof current === "number" ? current : 0;
+  const safeCurrent = Math.max(0, Math.min(safeSteps.length - 1, safeCurrentRaw));
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="relative flex items-center">
+        {/* Connecting track */}
+        <div className="absolute top-4 left-0 right-0 h-0.5 bg-border" />
+        <div
+          className="absolute top-4 left-0 h-0.5 bg-primary transition-all duration-500"
+          style={{ width: safeSteps.length > 1 ? `${(safeCurrent / (safeSteps.length - 1)) * 100}%` : "0%" }}
+        />
+        <div className="relative z-10 flex w-full justify-between">
+          {safeSteps.map((step, i) => {
+            const isDone = i < safeCurrent;
+            const isActive = i === safeCurrent;
+            return (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <div
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
+                    isDone
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : isActive
+                        ? "border-primary bg-background text-primary"
+                        : "border-border bg-background text-muted-foreground",
+                  )}
+                >
+                  {isDone ? (
+                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z" />
+                    </svg>
+                  ) : (
+                    <span>{i + 1}</span>
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    "max-w-[80px] text-center text-xs",
+                    isActive ? "font-semibold text-primary" : isDone ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {step}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+};
+
 export const Progress: RegistryComponent = ({ label, value }) => {
   const pct = Math.max(0, Math.min(100, num(value, 0)));
   const labelText = str(label);

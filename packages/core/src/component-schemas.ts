@@ -363,6 +363,37 @@ export const builtinPropSchemas: ComponentPropSchemas = {
       keys: z.string(),
     })
     .passthrough(),
+
+  Timeline: z
+    .object({
+      items: z.array(
+        z
+          .object({
+            id: z.string(),
+            title: z.string(),
+            description: z.string().optional(),
+            timestamp: z.string().optional(),
+            status: z.enum(["done", "current", "pending"]),
+          })
+          .passthrough(),
+      ),
+    })
+    .passthrough(),
+
+  Callout: z
+    .object({
+      variant: z.enum(["info", "warning", "success", "error"]),
+      title: z.string().optional(),
+      content: z.string().optional(),
+    })
+    .passthrough(),
+
+  Stepper: z
+    .object({
+      steps: z.array(z.string()),
+      current: z.number().optional(),
+    })
+    .passthrough(),
 };
 
 /* ------------------------------------------------------------------ *
