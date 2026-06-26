@@ -99,6 +99,34 @@ function buildCatalogText(extra: ComponentDoc[]): string {
     .join("\n");
 }
 
+const VISUAL_EXEMPLARS = `
+VISUAL EXEMPLARS (study these patterns):
+
+## KPI Row with Hero Stat
+\`\`\`json
+{ "op": "setRoot", "node": {
+  "id": "root", "type": "Grid", "props": { "gap": 6, "layoutPreset": "hero" },
+  "children": [
+    { "id": "hero-stat", "type": "Stat", "props": { "label": "Monthly Revenue", "value": "$248,400", "delta": "+18%", "trend": "up" }, "style": { "span": 12, "p": 6, "rounded": "xl", "bg": "primary", "color": "primary-foreground", "shadow": "lg" } },
+    { "id": "stat-users", "type": "Stat", "props": { "label": "Active Users", "value": "12,840", "delta": "+4.2%", "trend": "up" }, "style": { "span": 4, "p": 4, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-churn", "type": "Stat", "props": { "label": "Churn Rate", "value": "2.1%", "delta": "-0.4%", "trend": "down" }, "style": { "span": 4, "p": 4, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-arpu", "type": "Stat", "props": { "label": "ARPU", "value": "$19.34", "delta": "+$1.20", "trend": "up" }, "style": { "span": 4, "p": 4, "rounded": "lg", "shadow": "sm" } }
+  ]
+}}
+\`\`\`
+
+## Bento Layout (asymmetric hero + sidebar)
+\`\`\`json
+{ "op": "setRoot", "node": {
+  "id": "root", "type": "Grid", "props": { "gap": 4, "layoutPreset": "bento" },
+  "children": [
+    { "id": "chart-main", "type": "Chart", "props": { "title": "Revenue Trend", "kind": "line", "data": [{"x":"Jan","y":42000},{"x":"Feb","y":51000},{"x":"Mar","y":48000},{"x":"Apr","y":67000},{"x":"May","y":72000},{"x":"Jun","y":89000}] }, "style": { "span": 8, "p": 4, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-sidebar", "type": "Stat", "props": { "label": "Total Revenue", "value": "$369K", "delta": "+24%", "trend": "up" }, "style": { "span": 4, "p": 6, "rounded": "lg", "bg": "primary", "color": "primary-foreground" } }
+  ]
+}}
+\`\`\`
+`;
+
 const PATCH_REFERENCE = `PATCH OPERATIONS:
 Structure: setRoot{node}, setTitle{title}, append{parentId,node,index?},
   update{id,props}, replace{id,node}, move{id,parentId,index?}, remove{id}
@@ -136,9 +164,25 @@ RULES:
    editing so the UI animates in place.
 3. Prefer the smallest set of patches. Use setRoot only for a brand-new
    dashboard or a full redesign.
-4. The root node should be a Grid. Size children with style.span (1-12).
-5. Use realistic sample data unless the user provided real data.
-6. If the user only asks a question, answer in "message" with empty "patches".`;
+4. The root node MUST be a Grid. Children use style.span (1–12) to control width.
+5. VISUAL HIERARCHY — vary spans intentionally:
+   • Hero stats/KPIs: span 3–4 each, in a row of 3–4
+   • Charts: span 6 (half-width) or 12 (full-width) based on importance
+   • Tables: span 12
+   • Text/Headings: span 12
+   • Never give every child the same span — monotony is a failure mode
+6. LAYOUT PRESETS — set props.layoutPreset on any Grid node:
+   • "bento": first child span 8 (hero), second span 4 (sidebar), then alternating
+   • "split": alternating 7/5 split for content + detail panes
+   • "hero": first child full-width (span 12), rest span 4 cards
+   • "sidebar-detail": first child span 3 (nav), second span 9 (detail)
+   • "thirds": all children span 4
+   • "feed": all children span 12 (article/post list)
+7. CARD POLISH — Cards MUST have at minimum: style.p=4 or p=6, style.rounded="lg", style.shadow="sm"
+8. CHARTS — always include realistic varied data (not zeros), a title prop, and appropriate colors
+9. Use realistic sample data unless the user provided real data.
+10. If the user only asks a question, answer in "message" with empty "patches".
+${VISUAL_EXEMPLARS}`;
 
   const capSections = capabilities
     .map((c) => `\n\n## CAPABILITY: ${c.name}\n${c.systemPrompt.trim()}`)
