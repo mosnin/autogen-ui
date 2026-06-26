@@ -105,6 +105,13 @@ const styleCoreSchema = z.object({
   rounded: z.enum(["none", "sm", "md", "lg", "xl", "2xl", "full"]).optional(),
   shadow: z.enum(["none", "sm", "md", "lg", "xl"]).optional(),
   opacity: z.number().min(0).max(100).optional(),
+  blur: z.enum(["none", "sm", "md", "lg", "xl", "2xl"]).optional(),
+  glass: z.boolean().optional(),
+  gradient: z.enum(["to-r", "to-b", "to-br", "to-t", "to-tr", "to-bl"]).optional(),
+  gradientFrom: colorToken.optional(),
+  gradientTo: colorToken.optional(),
+  ring: z.enum(["none", "1", "2", "4"]).optional(),
+  ringColor: colorToken.optional(),
 
   // typography
   fontSize: z.enum(["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"]).optional(),
@@ -112,6 +119,9 @@ const styleCoreSchema = z.object({
   textAlign: z.enum(["left", "center", "right"]).optional(),
   italic: z.boolean().optional(),
   truncate: z.boolean().optional(),
+  letterSpacing: z.enum(["tighter", "tight", "normal", "wide", "wider", "widest"]).optional(),
+  lineHeight: z.enum(["none", "tight", "snug", "normal", "relaxed", "loose"]).optional(),
+  textTransform: z.enum(["uppercase", "lowercase", "capitalize", "normal-case"]).optional(),
 });
 
 export type StyleCore = z.infer<typeof styleCoreSchema>;

@@ -84,13 +84,56 @@ function replaceOutlet(layout: UINode, screen: UINode): UINode {
   return changed ? { ...layout, children: nextChildren } : layout;
 }
 
-/** The grid-span wrapper class is structural and owned by the renderer. */
-function spanClass(node: UINode): string {
+/** Compute the col-span for a child node, considering parent layout preset. */
+function resolveSpan(
+  node: UINode,
+  siblingIndex: number,
+  _siblingCount: number,
+  parentPreset?: string,
+): number {
+  // Explicit style.span or props.span always wins.
   const raw = node.style?.span ?? node.props?.span;
-  const span =
-    typeof raw === "number" && raw >= 1 && raw <= 12
-      ? Math.round(raw)
-      : (DEFAULT_SPAN[node.type] ?? 4);
+  if (typeof raw === "number" && raw >= 1 && raw <= 12) return Math.round(raw);
+
+  // Apply archetype distribution if parent has a preset.
+  if (parentPreset) {
+    switch (parentPreset) {
+      case "bento": {
+        // First child is hero (8), second is sidebar (4), rest alternate: wide(8)/narrow(4)
+        if (siblingIndex === 0) return 8;
+        if (siblingIndex === 1) return 4;
+        return siblingIndex % 2 === 0 ? 8 : 4;
+      }
+      case "split": {
+        // Alternating 7/5 split — content + detail pane
+        return siblingIndex % 2 === 0 ? 7 : 5;
+      }
+      case "thirds": {
+        // Equal thirds
+        return 4;
+      }
+      case "hero": {
+        // First child is full-width hero, rest are 4-col cards
+        return siblingIndex === 0 ? 12 : 4;
+      }
+      case "sidebar-detail": {
+        // Narrow sidebar (3) + wide detail (9)
+        return siblingIndex % 2 === 0 ? 3 : 9;
+      }
+      case "feed": {
+        // Feed: all items full width for legibility
+        return 12;
+      }
+      default:
+        break;
+    }
+  }
+
+  return DEFAULT_SPAN[node.type] ?? 4;
+}
+
+/** The grid-span wrapper class is structural and owned by the renderer. */
+function spanClass(span: number): string {
   return SPAN_MAP[span] ?? SPAN_MAP[4]!;
 }
 
@@ -123,6 +166,10 @@ interface RenderNodeProps {
   isRoot?: boolean;
   /** Sibling index within the parent, used for stagger. */
   siblingIndex?: number;
+  /** Layout preset of the parent node (e.g. "bento", "split"). */
+  parentPreset?: string;
+  /** Total number of siblings in parent (for context-aware distribution). */
+  siblingCount?: number;
 }
 
 function RenderNode({
@@ -132,6 +179,8 @@ function RenderNode({
   ctx,
   isRoot,
   siblingIndex = 0,
+  parentPreset,
+  siblingCount = 1,
 }: RenderNodeProps) {
   // Iteration scope: ForEach expansion writes `_scope` into the cloned
   // child's props; push it into ctx before binding resolution + render.
@@ -151,6 +200,10 @@ function RenderNode({
 
   const Comp = registry[node.type];
 
+  const childPreset =
+    typeof node.props?.layoutPreset === "string" ? node.props.layoutPreset : undefined;
+  const childCount = node.children?.length ?? 0;
+
   const renderedChildren =
     node.children && node.children.length > 0 ? (
       <AnimatePresence mode="popLayout" initial={false}>
@@ -162,6 +215,8 @@ function RenderNode({
             ext={ext}
             ctx={scopedCtx}
             siblingIndex={i}
+            parentPreset={childPreset}
+            siblingCount={childCount}
           />
         ))}
       </AnimatePresence>
@@ -186,7 +241,11 @@ function RenderNode({
     <motion.div
       layout
       layoutId={node.id}
-      className={cn(spanClass(node), "min-w-0", compiledStyle.className)}
+      className={cn(
+        spanClass(resolveSpan(node, siblingIndex, siblingCount, parentPreset)),
+        "min-w-0",
+        compiledStyle.className,
+      )}
       style={compiledStyle.style}
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
