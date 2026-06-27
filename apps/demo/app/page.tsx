@@ -310,7 +310,7 @@ export default function Page() {
               <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
                 Theme
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-4 gap-2">
                 {(Object.keys(brandPresets) as BrandPresetName[]).map((n) => (
                   <button
                     key={n}
