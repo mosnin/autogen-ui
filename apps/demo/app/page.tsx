@@ -4,6 +4,7 @@ import {
   BrandProvider,
   DashboardRenderer,
   brandPresets,
+  cn,
   useRuntime,
   useStreamingDashboard,
   type BrandPresetName,
@@ -46,6 +47,7 @@ export default function Page() {
   const [input, setInput] = useState("");
   const [brandName, setBrandName] = useState<BrandPresetName>("violet");
   const [dark, setDark] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -142,7 +144,11 @@ export default function Page() {
 
       <div className="flex min-h-0 flex-1">
         {/* Conversation */}
-        <aside className="flex w-[440px] flex-col">
+        <aside className={cn(
+          "flex flex-col transition-all duration-300",
+          sidebarOpen ? "w-[440px] min-w-[280px]" : "w-0 overflow-hidden",
+          "md:flex",
+        )}>
           <div
             ref={scrollRef}
             className="flex-1 space-y-6 overflow-y-auto px-8 pb-6"
@@ -232,6 +238,20 @@ export default function Page() {
 
         {/* Canvas */}
         <section className="relative min-w-0 flex-1 overflow-y-auto">
+          <button
+            type="button"
+            aria-label={sidebarOpen ? "Hide conversation" : "Show conversation"}
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="absolute left-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground md:hidden"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              {sidebarOpen ? (
+                <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+              ) : (
+                <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>
+              )}
+            </svg>
+          </button>
           <div className="relative px-12 pb-16 pt-8">
             <AnimatePresence mode="wait">
               {isEmpty ? (
