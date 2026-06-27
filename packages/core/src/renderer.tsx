@@ -245,17 +245,26 @@ function RenderNode({
   const compiledMotion = node.motion ? ext.compileMotion(node.motion) : {};
   const handlers = node.events ? ext.compileEvents(node.events, scopedCtx) : {};
 
+  // Choreograph entrances by visual weight: large structural nodes rise
+  // slower and further; compact nodes (stats, badges) snap in quickly.
+  const span = resolveSpan(node, siblingIndex, siblingCount, parentPreset);
+  const isLarge = span >= 8;
+  const isCompact = ["Badge", "Button", "Kbd", "Tooltip", "Switch", "Checkbox"].includes(node.type);
+  const entranceDuration = isCompact ? 0.28 : isLarge ? ENTRANCE_DURATION * 1.1 : ENTRANCE_DURATION;
+  const entranceY = isCompact ? 6 : isLarge ? 20 : 12;
+  const entranceScale = isCompact ? 1 : isLarge ? 0.96 : 0.97;
+
   return (
     <motion.div
       layout
       layoutId={node.id}
       className={cn(
-        spanClass(resolveSpan(node, siblingIndex, siblingCount, parentPreset)),
+        spanClass(span),
         "min-w-0",
         compiledStyle.className,
       )}
       style={compiledStyle.style}
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      initial={{ opacity: 0, y: entranceY, scale: entranceScale }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{
         opacity: 0,
@@ -263,7 +272,7 @@ function RenderNode({
         transition: { duration: 0.18, ease: EASE_EXIT },
       }}
       transition={{
-        duration: ENTRANCE_DURATION,
+        duration: entranceDuration,
         ease: EASE_OUT,
         delay: (siblingIndex * STAGGER_MS) / 1000,
         layout: { duration: 0.32, ease: EASE_OUT },
