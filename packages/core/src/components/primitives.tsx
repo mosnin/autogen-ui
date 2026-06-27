@@ -888,6 +888,12 @@ const CHART_COLORS = [
   "hsl(var(--chart-5))",
 ] as const;
 
+function formatAxisValue(n: number): string {
+  if (n >= 1_000_000) return `${parseFloat((n / 1_000_000).toPrecision(2))}M`;
+  if (n >= 1_000) return `${parseFloat((n / 1_000).toPrecision(2))}K`;
+  return `${Math.round(n)}`;
+}
+
 function toPoints(data: unknown): Point[] {
   return arr<Record<string, unknown>>(data).map((d, i) => ({
     label: str(d?.label, String(i + 1)),
@@ -1083,13 +1089,18 @@ function MultiSeriesChartBody({
     const barW = (groupW * 0.72) / n;
     const groupPad = groupW * 0.14;
     return (
-      <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
+      <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
         <title>{ariaLabel}</title>
         <g aria-hidden>
           {grid.map((y, i) => (
             <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
           ))}
         </g>
+        {grid.map((y, i) => (
+          <text key={i} x={-4} y={y + 3} textAnchor="end" className="text-[9px] font-tabular fill-muted-foreground/60" fontSize="9">
+            {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
+          </text>
+        ))}
         {labels.map((label, gi) => (
           <g key={gi}>
             {series.map((s, si) => {
@@ -1121,7 +1132,7 @@ function MultiSeriesChartBody({
 
   const step = labels.length > 1 ? innerW / (labels.length - 1) : 0;
   return (
-    <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
+    <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
       <title>{ariaLabel}</title>
       <defs>
         {series.map((s, si) => (
@@ -1136,6 +1147,11 @@ function MultiSeriesChartBody({
           <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
         ))}
       </g>
+      {grid.map((y, i) => (
+        <text key={i} x={-4} y={y + 3} textAnchor="end" className="text-[9px] font-tabular fill-muted-foreground/60" fontSize="9">
+          {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
+        </text>
+      ))}
       {series.map((s, si) => {
         const coords = s.points.map((p, i) => ({
           x: PAD + i * step,
