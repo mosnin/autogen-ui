@@ -187,15 +187,15 @@ export default function Page() {
             )}
 
             {isLoading && (
-              <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="h-1 w-1 rounded-full bg-foreground/30 animate-thinking"
-                    style={{ animationDelay: `${i * 0.18}s` }}
-                  />
-                ))}
-              </div>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="text-[13px] text-muted-foreground/60 italic"
+              >
+                Building…
+              </motion.p>
             )}
 
             {error && (
@@ -238,6 +238,21 @@ export default function Page() {
 
         {/* Canvas */}
         <section className="relative min-w-0 flex-1 overflow-y-auto">
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div
+                key="loading-bar"
+                className="absolute inset-x-0 top-0 z-20 h-[2px] origin-left bg-primary/60"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 0.85 }}
+                exit={{ scaleX: 1, opacity: 0 }}
+                transition={{
+                  scaleX: { duration: 8, ease: [0.1, 0.4, 0.6, 1] },
+                  opacity: { duration: 0.3 },
+                }}
+              />
+            )}
+          </AnimatePresence>
           <button
             type="button"
             aria-label={sidebarOpen ? "Hide conversation" : "Show conversation"}
