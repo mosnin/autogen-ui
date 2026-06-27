@@ -35,7 +35,7 @@ const GAP: Record<number, string> = {
  * `span` prop, which the renderer turns into responsive column classes.
  */
 export const Grid: RegistryComponent = ({ children, gap }) => (
-  <div className={cn("grid grid-cols-1 sm:grid-cols-6 lg:grid-cols-12", GAP[num(gap, 4)] ?? "gap-4")}>
+  <div className={cn("grid grid-cols-1 sm:grid-cols-6 lg:grid-cols-12", GAP[num(gap, 6)] ?? "gap-6")}>
     {children}
   </div>
 );
@@ -60,9 +60,9 @@ export const Stack: RegistryComponent = ({ children, direction, gap, align }) =>
 
 /** A titled section header followed by its children. */
 export const Section: RegistryComponent = ({ children, title, description }) => (
-  <section className="space-y-4 py-2">
+  <section className="space-y-6 py-4">
     {(str(title) || str(description)) && (
-      <header className="space-y-1.5 pb-1 border-b border-border/60">
+      <header className="space-y-1.5 pb-3 border-b border-border/60">
         {str(title) && (
           <h2 className="text-xl font-semibold tracking-tight text-foreground">{str(title)}</h2>
         )}
