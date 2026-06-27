@@ -767,14 +767,14 @@ function toNamedSeries(data: unknown, seriesKeys: string[]): NamedSeries[] {
 }
 
 /**
- * Chart: `kind` of "bar" | "line" | "area", `data: {label,value}[]`.
- * For multi-series pass `series: ["key1","key2"]` and wide-format data rows.
+ * Chart: `kind` of "bar"|"line"|"area"|"pie"|"donut", `data: {label,value}[]`.
+ * For multi-series bar/line pass `series: ["key1","key2"]` and wide-format rows.
  * Rendered as inline SVG — no charting dependency.
  */
 export const Chart: RegistryComponent = ({ kind, data, title, subtitle, series }) => {
-  const k = oneOf(kind, ["bar", "line", "area"] as const, "bar");
+  const k = oneOf(kind, ["bar", "line", "area", "pie", "donut"] as const, "bar");
   const seriesKeys = arr<string>(series).filter((s): s is string => typeof s === "string");
-  const isMulti = seriesKeys.length > 1;
+  const isMulti = seriesKeys.length > 1 && k !== "pie" && k !== "donut";
   const namedSeries = isMulti ? toNamedSeries(data, seriesKeys) : null;
   const points = isMulti ? [] : toPoints(data);
   const titleText = str(title);
@@ -840,12 +840,82 @@ export const Chart: RegistryComponent = ({ kind, data, title, subtitle, series }
           </svg>
           <p className="text-xs">No data to display</p>
         </div>
+      ) : k === "pie" || k === "donut" ? (
+        <>
+          <PieChartBody points={points} donut={k === "donut"} ariaLabel={ariaLabel} />
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+            {points.map((p, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                {p.label}
+              </span>
+            ))}
+          </div>
+        </>
       ) : (
         <ChartBody kind={k} points={points} ariaLabel={ariaLabel} />
       )}
     </div>
   );
 };
+
+function PieChartBody({
+  points,
+  donut,
+  ariaLabel,
+}: {
+  points: Point[];
+  donut: boolean;
+  ariaLabel: string;
+}): ReactNode {
+  const R = 80;
+  const CX = 120;
+  const CY = 90;
+  const W = 240;
+  const H = 180;
+  const total = points.reduce((s, p) => s + Math.max(0, p.value), 0) || 1;
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  let angle = -Math.PI / 2;
+  const slices = points.map((p, i) => {
+    const sweep = (Math.max(0, p.value) / total) * Math.PI * 2;
+    const start = angle;
+    angle += sweep;
+    const x1 = CX + R * Math.cos(start);
+    const y1 = CY + R * Math.sin(start);
+    const x2 = CX + R * Math.cos(angle);
+    const y2 = CY + R * Math.sin(angle);
+    const largeArc = sweep > Math.PI ? 1 : 0;
+    const d = donut
+      ? `M ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} L ${CX + (R - 36) * Math.cos(angle)} ${CY + (R - 36) * Math.sin(angle)} A ${R - 36} ${R - 36} 0 ${largeArc} 0 ${CX + (R - 36) * Math.cos(start)} ${CY + (R - 36) * Math.sin(start)} Z`
+      : `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+    return { d, color: CHART_COLORS[i % CHART_COLORS.length]!, pct: ((p.value / total) * 100).toFixed(1), label: p.label };
+  });
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto max-h-[180px]" role="img" aria-label={ariaLabel}>
+      <title>{ariaLabel}</title>
+      {slices.map((s, i) => (
+        <motion.path
+          key={i}
+          d={s.d}
+          fill={s.color}
+          opacity={hovered === null || hovered === i ? 1 : 0.5}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: hovered === null || hovered === i ? 1 : 0.5 }}
+          onHoverStart={() => setHovered(i)}
+          onHoverEnd={() => setHovered(null)}
+          style={{ cursor: "pointer" }}
+        />
+      ))}
+      {hovered !== null && slices[hovered] && (
+        <text x={CX} y={CY + 5} textAnchor="middle" className="text-[11px] font-tabular fill-foreground" fontSize="11">
+          {slices[hovered]!.pct}%
+        </text>
+      )}
+    </svg>
+  );
+}
 
 function MultiSeriesChartBody({
   kind,
