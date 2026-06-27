@@ -119,18 +119,26 @@ EXEMPLARS — study the pattern, the proportions, the specificity of the data:
 }}
 \`\`\`
 
-## Bento — asymmetric hero chart + accent stat sidebar
+## Bento — asymmetric hero chart + multi-series comparison + sidebar KPIs
 \`\`\`json
 { "op": "setRoot", "node": {
-  "id": "root", "type": "Grid", "props": { "gap": 4, "layoutPreset": "bento" },
+  "id": "root", "type": "Grid", "props": { "gap": 6, "layoutPreset": "bento" },
   "children": [
-    { "id": "chart-revenue", "type": "Chart",
-      "props": { "title": "Revenue Trend", "kind": "line",
-        "data": [{"x":"Jan","y":41200},{"x":"Feb","y":48700},{"x":"Mar","y":45900},{"x":"Apr","y":62300},{"x":"May","y":71800},{"x":"Jun","y":89400}] },
-      "style": { "span": 8, "p": 4, "rounded": "lg", "shadow": "sm" } },
-    { "id": "stat-total", "type": "Stat",
-      "props": { "label": "6-Month Total", "value": "$359,300", "delta": "+24%", "trend": "up" },
-      "style": { "span": 4, "p": 6, "rounded": "lg", "bg": "primary", "color": "primary-foreground", "shadow": "md" } }
+    { "id": "chart-revenue-vs-cost", "type": "Chart",
+      "props": { "title": "Revenue vs. Cost", "subtitle": "Q1–Q2 2025", "kind": "bar",
+        "series": ["Revenue", "Cost"],
+        "data": [
+          {"label":"Jan","Revenue":41200,"Cost":28400},
+          {"label":"Feb","Revenue":48700,"Cost":31200},
+          {"label":"Mar","Revenue":45900,"Cost":29800},
+          {"label":"Apr","Revenue":62300,"Cost":33100},
+          {"label":"May","Revenue":71800,"Cost":38700},
+          {"label":"Jun","Revenue":89400,"Cost":41200}
+        ] },
+      "style": { "span": 8 } },
+    { "id": "metric-margin", "type": "Metric",
+      "props": { "label": "Gross Margin", "value": "54.2", "suffix": "%", "description": "+6.1pp vs H1 2024", "trend": "up" },
+      "style": { "span": 4 } }
   ]
 }}
 \`\`\`
@@ -205,6 +213,9 @@ OPINIONS (these encode taste, not just correctness):
    • Supporting KPIs in a row: span 3–4 (three or four across)
    • Secondary charts: span 6
    • Tables, headings, full-width elements: span 12
+   Use Metric (not Stat) when ONE number should visually own a section — large
+   tabular font, centered, with optional prefix ("$") or suffix ("%").
+   Use Chart series:["A","B"] for grouped comparison charts (two series max for clarity).
 
 6. Set props.layoutPreset on Grid nodes to signal layout intent:
    • "bento"  — hero(8) + sidebar(4), then balanced pairs. Asymmetric, editorial.
