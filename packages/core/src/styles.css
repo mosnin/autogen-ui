@@ -110,3 +110,20 @@
   background-color: hsl(var(--background) / 0.75);
   border: 1px solid hsl(var(--border) / 0.5);
 }
+
+/* Directional shimmer for Skeleton loading states — iOS-style left-to-right sweep. */
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted))                      0%,
+    hsl(var(--muted-foreground) / 0.08)   50%,
+    hsl(var(--muted))                     100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 1.6s ease-in-out infinite;
+}

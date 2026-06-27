@@ -97,14 +97,14 @@ export const Skeleton: RegistryComponent = ({ lines, height }) => {
   const count = Math.max(1, num(lines, 1));
   const h = oneOf(height, SKELETON_HEIGHTS, "md");
   return (
-    <div className="flex flex-col gap-2 w-full" aria-busy="true" aria-live="polite">
+    <div className="flex flex-col gap-2.5 w-full" aria-busy="true" aria-live="polite">
       {Array.from({ length: count }).map((_, i) => {
         const isLast = i === count - 1 && count > 1;
         return (
           <div
             key={i}
             className={cn(
-              "animate-pulse rounded-md bg-muted",
+              "skeleton-shimmer rounded-md",
               SKELETON_H[h],
               isLast ? "w-2/3" : "w-full",
             )}
