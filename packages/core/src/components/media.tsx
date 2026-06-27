@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "../utils";
 import { bool, num, oneOf, str } from "./helpers";
 import type { ComponentRegistry, RegistryComponent } from "./types";
@@ -121,20 +122,33 @@ export const Skeleton: RegistryComponent = ({ lines, height }) => {
 
 export const CodeBlock: RegistryComponent = ({ code, language }) => {
   const lang = str(language);
+  const content = str(code);
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
+
   return (
-    <div className="relative rounded-lg border border-border bg-muted/50 overflow-hidden">
-      {lang && (
-        <span
-          className={cn(
-            "absolute right-2 top-2 rounded-full border border-border bg-background",
-            "px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide",
-          )}
-        >
-          {lang}
+    <div className="relative rounded-lg border border-border bg-muted/50 overflow-hidden group">
+      <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-2">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+          {lang || "code"}
         </span>
-      )}
+        <button
+          type="button"
+          onClick={copy}
+          aria-label={copied ? "Copied" : "Copy code"}
+          className="text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-muted-foreground"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
       <pre className="overflow-x-auto p-4 text-sm leading-relaxed">
-        <code className="font-mono text-foreground">{str(code)}</code>
+        <code className="font-mono text-foreground">{content}</code>
       </pre>
     </div>
   );
