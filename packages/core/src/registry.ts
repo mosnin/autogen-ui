@@ -10,6 +10,7 @@ import {
   Card,
   Chart,
   Divider,
+  EmptyState,
   Grid,
   Heading,
   List,
@@ -22,6 +23,8 @@ import {
   Stat,
   Stepper,
   Table,
+  Tag,
+  TagGroup,
   Text,
   Timeline,
 } from "./components/primitives";
@@ -318,6 +321,24 @@ export const componentCatalog: ComponentDoc[] = [
     props: "steps: string[], current: number (0-indexed active step)",
     acceptsChildren: false,
   },
+  {
+    type: "Tag",
+    description: "Single chip-style label. More expressive than Badge — use for filterable tags, categories, or multi-value selections.",
+    props: "label: string, variant?: 'default'|'blue'|'green'|'amber'|'red'|'purple', removable?: boolean",
+    acceptsChildren: false,
+  },
+  {
+    type: "TagGroup",
+    description: "Renders an array of tags as a wrapping chip row. Each item can be a string or {label, variant?}.",
+    props: "tags: (string | {label: string, variant?: string})[], variant?: 'default'|'blue'|'green'|'amber'|'red'|'purple'",
+    acceptsChildren: false,
+  },
+  {
+    type: "EmptyState",
+    description: "Illustrated empty state for dashboards. Use when a section has no data yet, or as a placeholder for future content. Optionally shows a call-to-action button.",
+    props: "title?: string, description?: string, icon?: 'inbox'|'search'|'chart'|'file'|'users'|'default', action?: string (button label)",
+    acceptsChildren: false,
+  },
 ];
 
 /** Built-in component registry mapping spec `type` -> React component. */
@@ -366,6 +387,9 @@ export const defaultRegistry: ComponentRegistry = {
   Timeline,
   Callout,
   Stepper,
+  Tag,
+  TagGroup,
+  EmptyState,
 };
 
 /** Merge custom components onto the defaults. Custom entries win on conflict. */

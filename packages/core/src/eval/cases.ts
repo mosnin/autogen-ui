@@ -186,4 +186,71 @@ export const goldenCases: EvalCase[] = [
       return null;
     },
   },
+  {
+    name: "visual: uses TagGroup or EmptyState where appropriate",
+    messages: [
+      { role: "user", content: "Build a product catalog dashboard with category filtering and an empty results state." },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      if (result.patches.length === 0) return "expected patches";
+      let hasTagOrEmpty = false;
+      function walk(node: { type?: string; children?: typeof node[] }) {
+        if (node.type === "TagGroup" || node.type === "Tag" || node.type === "EmptyState") {
+          hasTagOrEmpty = true;
+        }
+        for (const child of node.children ?? []) walk(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walk(p.node);
+        if (p.op === "append") walk(p.node);
+        if (p.op === "replace") walk(p.node);
+      }
+      return hasTagOrEmpty ? null : "expected TagGroup, Tag, or EmptyState for catalog + filter UI";
+    },
+  },
+  {
+    name: "visual: Metric used for the single most important KPI",
+    messages: [
+      { role: "user", content: "Build an executive summary with the single most important business metric front and center, then supporting stats." },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      let metricFound = false;
+      function walk(node: { type?: string; children?: typeof node[] }) {
+        if (node.type === "Metric") metricFound = true;
+        for (const child of node.children ?? []) walk(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walk(p.node);
+        if (p.op === "append") walk(p.node);
+        if (p.op === "replace") walk(p.node);
+      }
+      return metricFound ? null : "expected a Metric node for the hero KPI — Metric is for the single number that dominates the view";
+    },
+  },
+  {
+    name: "visual: RingProgress or Sparkline used in supporting role",
+    messages: [
+      { role: "user", content: "Show team performance — completion rates, trend lines, and individual stats." },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      if (result.patches.length === 0) return "expected patches";
+      let hasCompact = false;
+      function walk(node: { type?: string; children?: typeof node[] }) {
+        if (node.type === "RingProgress" || node.type === "Sparkline") hasCompact = true;
+        for (const child of node.children ?? []) walk(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walk(p.node);
+        if (p.op === "append") walk(p.node);
+        if (p.op === "replace") walk(p.node);
+      }
+      return hasCompact ? null : "expected RingProgress or Sparkline for compact visual data — these components add density without clutter";
+    },
+  },
 ];

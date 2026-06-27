@@ -414,6 +414,65 @@ export const Badge: RegistryComponent = ({ label, variant }) => (
   </span>
 );
 
+/* ------------------------------------------------------------------ *
+ * Tag / TagGroup
+ * ------------------------------------------------------------------ */
+
+const TAG_VARIANT: Record<string, string> = {
+  default: "bg-secondary text-secondary-foreground border border-border/60",
+  blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+  green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+  red: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20",
+  purple: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20",
+};
+
+export const Tag: RegistryComponent = ({ label, variant, removable }) => (
+  <span
+    className={cn(
+      "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium w-fit",
+      TAG_VARIANT[str(variant, "default")] ?? TAG_VARIANT.default,
+    )}
+  >
+    {str(label)}
+    {bool(removable, false) && (
+      <span aria-hidden="true" className="ml-0.5 opacity-40 hover:opacity-80 cursor-pointer transition-opacity leading-none">
+        ×
+      </span>
+    )}
+  </span>
+);
+
+export const TagGroup: RegistryComponent = ({ tags, variant }) => {
+  const items = Array.isArray(tags) ? tags : [];
+  const groupVariant = str(variant, "default");
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((tag: unknown, i: number) => {
+        const label =
+          typeof tag === "string" ? tag
+          : typeof tag === "object" && tag !== null ? str((tag as Record<string, unknown>).label)
+          : String(tag ?? "");
+        const tv =
+          typeof tag === "object" && tag !== null
+            ? str((tag as Record<string, unknown>).variant, groupVariant)
+            : groupVariant;
+        return (
+          <span
+            key={i}
+            className={cn(
+              "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
+              TAG_VARIANT[tv] ?? TAG_VARIANT.default,
+            )}
+          >
+            {label}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 const BUTTON_VARIANT: Record<string, string> = {
   default: "bg-primary text-primary-foreground hover:bg-primary/90",
   secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -1321,3 +1380,82 @@ function ChartBody({
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ *
+ * EmptyState
+ * ------------------------------------------------------------------ */
+
+const EMPTY_ICONS: Record<string, ReactNode> = {
+  inbox: (
+    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  ),
+  search: (
+    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+    </svg>
+  ),
+  chart: (
+    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  file: (
+    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+  users: (
+    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  default: (
+    <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  ),
+};
+
+export const EmptyState: RegistryComponent = ({ title, description, icon, action }) => {
+  const titleText = str(title, "Nothing here yet");
+  const descText = str(description);
+  const iconKey = str(icon, "default");
+  const actionLabel = str(action);
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/60 bg-muted/20 px-6 py-14 text-center">
+      <motion.div
+        className="text-muted-foreground/40"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4, ease: EASE_OUT }}
+      >
+        {EMPTY_ICONS[iconKey] ?? EMPTY_ICONS.default}
+      </motion.div>
+      <div className="space-y-1.5 max-w-xs">
+        <p className="text-sm font-semibold text-foreground">{titleText}</p>
+        {descText && <p className="text-sm text-muted-foreground leading-relaxed">{descText}</p>}
+      </div>
+      {actionLabel && (
+        <button
+          type="button"
+          className="mt-1 inline-flex items-center rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+};

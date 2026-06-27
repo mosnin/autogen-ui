@@ -72,6 +72,9 @@ const DEFAULT_SPAN: Record<string, number> = {
   Kbd: 2,
   ForEach: 12,
   Outlet: 12,
+  Tag: 2,
+  TagGroup: 6,
+  EmptyState: 12,
 };
 
 /** Substitute the first `Outlet` node in `layout` with `screen`. */
