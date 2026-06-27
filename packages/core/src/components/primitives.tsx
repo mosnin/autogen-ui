@@ -60,14 +60,14 @@ export const Stack: RegistryComponent = ({ children, direction, gap, align }) =>
 
 /** A titled section header followed by its children. */
 export const Section: RegistryComponent = ({ children, title, description }) => (
-  <section className="space-y-3">
+  <section className="space-y-4 py-2">
     {(str(title) || str(description)) && (
-      <header className="space-y-1">
+      <header className="space-y-1.5 pb-1 border-b border-border/60">
         {str(title) && (
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">{str(title)}</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">{str(title)}</h2>
         )}
         {str(description) && (
-          <p className="text-sm text-muted-foreground">{str(description)}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{str(description)}</p>
         )}
       </header>
     )}
@@ -173,7 +173,7 @@ export const Stat: RegistryComponent = ({ label, value, delta, trend, sparkline 
       <span
         role="text"
         aria-label={`${labelText}: ${fallbackText}`}
-        className="font-tabular font-display text-3xl font-semibold tracking-tight leading-tight"
+        className="font-tabular text-3xl font-semibold tracking-tight leading-none"
       >
         {isNumeric ? (
           <CountUpNumber value={numericValue} format={(n) => Math.round(n).toLocaleString()} />
@@ -184,13 +184,22 @@ export const Stat: RegistryComponent = ({ label, value, delta, trend, sparkline 
       {str(delta) && (
         <span
           className={cn(
-            "text-xs font-medium font-tabular inline-flex items-center gap-1",
-            t === "up" && "text-success",
-            t === "down" && "text-danger",
+            "text-xs font-medium font-tabular inline-flex items-center gap-0.5",
+            t === "up" && "text-[hsl(var(--success))]",
+            t === "down" && "text-[hsl(var(--danger))]",
             t === "flat" && "text-muted-foreground",
           )}
         >
-          {t === "up" ? "↑ " : t === "down" ? "↓ " : ""}
+          {t === "up" && (
+            <svg className="h-3 w-3 shrink-0" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <path d="M6 2.5 10.5 7H7.5v2.5h-3V7H1.5z" />
+            </svg>
+          )}
+          {t === "down" && (
+            <svg className="h-3 w-3 shrink-0" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <path d="M6 9.5 1.5 5H4.5V2.5h3V5H10.5z" />
+            </svg>
+          )}
           {str(delta)}
         </span>
       )}
@@ -223,9 +232,9 @@ const REVEAL_VARIANTS = ["none", "words", "chars"] as const;
 export const Heading: RegistryComponent = ({ text, level, reveal }) => {
   const lvl = oneOf(String(num(level, 2)), ["1", "2", "3"] as const, "2");
   const cls = {
-    "1": "text-2xl font-bold tracking-tight",
-    "2": "text-xl font-semibold tracking-tight",
-    "3": "text-base font-semibold",
+    "1": "text-4xl font-bold tracking-tighter leading-tight",
+    "2": "text-2xl font-semibold tracking-tight",
+    "3": "text-lg font-semibold tracking-tight",
   }[lvl];
   const content = str(text);
   const slug = content ? slugify(content) : "";
