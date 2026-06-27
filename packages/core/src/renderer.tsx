@@ -41,6 +41,7 @@ const SPAN_MAP: Record<number, string> = {
 const DEFAULT_SPAN: Record<string, number> = {
   Stat: 3,
   Metric: 6,
+  Sparkline: 3,
   Card: 4,
   Chart: 6,
   Table: 12,

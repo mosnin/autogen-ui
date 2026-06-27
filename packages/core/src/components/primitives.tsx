@@ -115,38 +115,77 @@ function CountUpNumber({ value, format }: { value: number; format: (n: number) =
   return <motion.span>{rounded}</motion.span>;
 }
 
-/** Tiny inline sparkline from `number[]`. Uses chart-1. */
-function StatSparkline({ data }: { data: number[] }) {
+const SPARKLINE_HEIGHTS: Record<string, string> = {
+  sm: "h-4 w-16",
+  md: "h-6 w-24",
+  lg: "h-9 w-32",
+};
+
+function SparklineSVG({
+  data,
+  sizeClass,
+  color,
+  trend,
+}: {
+  data: number[];
+  sizeClass: string;
+  color: string;
+  trend: boolean;
+}) {
   if (data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
   const W = 80;
-  const H = 22;
+  const H = 24;
   const step = W / (data.length - 1);
-  const path = data
-    .map((v, i) => {
-      const x = i * step;
-      const y = H - ((v - min) / range) * H;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const coords = data.map((v, i) => ({
+    x: i * step,
+    y: H - ((v - min) / range) * (H - 2) - 1,
+  }));
+  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const area = `${path} L${W},${H} L0,${H} Z`;
+  const isUp = trend && data[data.length - 1]! >= data[0]!;
+  const strokeColor = trend
+    ? isUp ? "hsl(var(--success))" : "hsl(var(--danger))"
+    : color;
+  const fillColor = trend
+    ? isUp ? "hsl(var(--success) / 0.15)" : "hsl(var(--danger) / 0.15)"
+    : `${color.replace(")", " / 0.12)")}`;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-5 w-20 text-chart-1" aria-hidden>
+    <svg viewBox={`0 0 ${W} ${H}`} className={sizeClass} aria-hidden>
+      <motion.path d={area} fill={fillColor} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} />
       <motion.path
         d={path}
         fill="none"
-        stroke="currentColor"
+        stroke={strokeColor}
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
         initial={{ pathLength: 0, opacity: 0 }}
         animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 0.6, ease: EASE_OUT, delay: 0.15 }}
+        transition={{ duration: 0.6, ease: EASE_OUT, delay: 0.1 }}
       />
     </svg>
   );
 }
+
+/** Reusable by StatSparkline (backward compat). */
+function StatSparkline({ data }: { data: number[] }) {
+  return <SparklineSVG data={data} sizeClass="h-5 w-20" color="hsl(var(--chart-1))" trend={false} />;
+}
+
+/** Standalone sparkline component — inline trend line from a number array. */
+export const Sparkline: RegistryComponent = ({ data, size, trend, color }) => {
+  const nums = arr<unknown>(data)
+    .map((n) => (typeof n === "number" ? n : Number(n)))
+    .filter((n) => Number.isFinite(n));
+  const s = oneOf(size, ["sm", "md", "lg"] as const, "md");
+  const showTrend = bool(trend, true);
+  const c = str(color, "hsl(var(--chart-1))");
+  return <SparklineSVG data={nums} sizeClass={SPARKLINE_HEIGHTS[s]!} color={c} trend={showTrend} />;
+};
 
 /**
  * A KPI tile. Numeric `value` counts up on first render and on change.

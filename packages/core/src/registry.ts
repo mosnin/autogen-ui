@@ -16,6 +16,7 @@ import {
   Metric,
   Progress,
   Section,
+  Sparkline,
   Stack,
   Stat,
   Stepper,
@@ -75,6 +76,13 @@ export const componentCatalog: ComponentDoc[] = [
       "Hero number — one metric that dominates the section. Larger than Stat, centered, no border. Use for the single most important number on a page.",
     props:
       "label?: string, value: string|number, prefix?: string (e.g. '$'), suffix?: string (e.g. '%'), description?: string (shows below with trend color), trend?: 'up'|'down'|'flat', span?: 1-12 (default 6)",
+    acceptsChildren: false,
+  },
+  {
+    type: "Sparkline",
+    description:
+      "Inline mini trend line from a number array. Area-filled, trend-colored (green if rising, red if falling). Use inside cards, next to labels, or as standalone context.",
+    props: "data: number[], size?: 'sm'|'md'|'lg' (default 'md'), trend?: boolean (color by direction, default true), color?: string (CSS color override)",
     acceptsChildren: false,
   },
   {
@@ -312,6 +320,7 @@ export const defaultRegistry: ComponentRegistry = {
   Card,
   Stat,
   Metric,
+  Sparkline,
   Chart,
   Table,
   Heading,
