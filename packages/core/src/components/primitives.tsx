@@ -207,6 +207,65 @@ export const Stat: RegistryComponent = ({ label, value, delta, trend, sparkline 
   );
 };
 
+/**
+ * Hero number for "one metric that matters". Larger than Stat, no border,
+ * centered — designed to dominate a full-width or half-width section.
+ */
+export const Metric: RegistryComponent = ({ label, value, prefix, suffix, description, trend }) => {
+  const labelText = str(label);
+  const numericValue = typeof value === "number" ? value : NaN;
+  const isNumeric = Number.isFinite(numericValue);
+  const displayValue = isNumeric ? numericValue.toLocaleString() : str(value, "—");
+  const t = oneOf(trend, ["up", "down", "flat"] as const, "flat");
+
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-6 gap-2">
+      {labelText && (
+        <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          {labelText}
+        </span>
+      )}
+      <div className="flex items-baseline gap-1.5" role="text" aria-label={`${labelText}: ${str(prefix)}${displayValue}${str(suffix)}`}>
+        {str(prefix) && (
+          <span className="text-2xl font-semibold text-muted-foreground font-tabular">{str(prefix)}</span>
+        )}
+        <span className="font-tabular text-6xl font-bold tracking-tighter leading-none text-foreground">
+          {isNumeric ? (
+            <CountUpNumber value={numericValue} format={(n) => Math.round(n).toLocaleString()} />
+          ) : (
+            displayValue
+          )}
+        </span>
+        {str(suffix) && (
+          <span className="text-2xl font-semibold text-muted-foreground font-tabular">{str(suffix)}</span>
+        )}
+      </div>
+      {str(description) && (
+        <p
+          className={cn(
+            "text-sm font-medium font-tabular inline-flex items-center gap-1",
+            t === "up" && "text-[hsl(var(--success))]",
+            t === "down" && "text-[hsl(var(--danger))]",
+            t === "flat" && "text-muted-foreground",
+          )}
+        >
+          {t === "up" && (
+            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <path d="M6 2.5 10.5 7H7.5v2.5h-3V7H1.5z" />
+            </svg>
+          )}
+          {t === "down" && (
+            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+              <path d="M6 9.5 1.5 5H4.5V2.5h3V5H10.5z" />
+            </svg>
+          )}
+          {str(description)}
+        </p>
+      )}
+    </div>
+  );
+};
+
 function useTypewriter(target: string, speedMs: number): string {
   const [shown, setShown] = useState(speedMs <= 0 ? target : "");
   useEffect(() => {

@@ -13,6 +13,7 @@ import {
   Grid,
   Heading,
   List,
+  Metric,
   Progress,
   Section,
   Stack,
@@ -66,6 +67,14 @@ export const componentCatalog: ComponentDoc[] = [
     description: "KPI tile: a label, a big value, and an optional delta with trend color.",
     props:
       "label: string, value: string|number, delta?: string, trend?: 'up'|'down'|'flat', span?: 1-12 (default 3)",
+    acceptsChildren: false,
+  },
+  {
+    type: "Metric",
+    description:
+      "Hero number — one metric that dominates the section. Larger than Stat, centered, no border. Use for the single most important number on a page.",
+    props:
+      "label?: string, value: string|number, prefix?: string (e.g. '$'), suffix?: string (e.g. '%'), description?: string (shows below with trend color), trend?: 'up'|'down'|'flat', span?: 1-12 (default 6)",
     acceptsChildren: false,
   },
   {
@@ -302,6 +311,7 @@ export const defaultRegistry: ComponentRegistry = {
   Section,
   Card,
   Stat,
+  Metric,
   Chart,
   Table,
   Heading,
