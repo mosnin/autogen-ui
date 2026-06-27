@@ -646,6 +646,49 @@ export const Stepper: RegistryComponent = ({ steps, current = 0, children }) => 
   );
 };
 
+/** Circular ring progress with centered label. */
+export const RingProgress: RegistryComponent = ({ value, label, size, color }) => {
+  const pct = Math.max(0, Math.min(100, num(value, 0)));
+  const s = oneOf(size, ["sm", "md", "lg"] as const, "md");
+  const dim = s === "sm" ? 64 : s === "lg" ? 120 : 88;
+  const strokeW = s === "sm" ? 6 : s === "lg" ? 10 : 8;
+  const r = (dim - strokeW) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  const labelText = str(label);
+  const strokeColor = str(color, "hsl(var(--primary))");
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: dim, height: dim }}>
+        <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} role="img" aria-label={`${labelText || "Progress"}: ${pct}%`}>
+          <circle cx={dim / 2} cy={dim / 2} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={strokeW} />
+          <motion.circle
+            cx={dim / 2}
+            cy={dim / 2}
+            r={r}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+            strokeDasharray={`${circ}`}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: circ - dash }}
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            style={{ transformOrigin: "center", transform: "rotate(-90deg)" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={cn("font-tabular font-semibold", s === "sm" ? "text-xs" : s === "lg" ? "text-xl" : "text-sm")}>
+            {pct}%
+          </span>
+        </div>
+      </div>
+      {labelText && <span className="text-xs text-muted-foreground text-center">{labelText}</span>}
+    </div>
+  );
+};
+
 export const Progress: RegistryComponent = ({ label, value }) => {
   const pct = Math.max(0, Math.min(100, num(value, 0)));
   const labelText = str(label);

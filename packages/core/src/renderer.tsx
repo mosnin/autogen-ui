@@ -66,6 +66,7 @@ const DEFAULT_SPAN: Record<string, number> = {
   Tooltip: 3,
   Avatar: 2,
   Skeleton: 6,
+  RingProgress: 3,
   CodeBlock: 12,
   Quote: 12,
   Kbd: 2,

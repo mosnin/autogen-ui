@@ -15,6 +15,7 @@ import {
   List,
   Metric,
   Progress,
+  RingProgress,
   Section,
   Sparkline,
   Stack,
@@ -128,6 +129,13 @@ export const componentCatalog: ComponentDoc[] = [
     type: "Progress",
     description: "Horizontal progress bar.",
     props: "label?: string, value: number (0-100)",
+    acceptsChildren: false,
+  },
+  {
+    type: "RingProgress",
+    description:
+      "Circular ring with animated fill and centered percentage. Use for completion rates, scores, and single-dimension progress.",
+    props: "value: number (0-100), label?: string, size?: 'sm'|'md'|'lg' (default 'md'), color?: string (CSS color, defaults to primary)",
     acceptsChildren: false,
   },
   {
@@ -328,6 +336,7 @@ export const defaultRegistry: ComponentRegistry = {
   Badge,
   Button,
   Progress,
+  RingProgress,
   List,
   Divider,
   Box,
