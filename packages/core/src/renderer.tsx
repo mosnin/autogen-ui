@@ -139,8 +139,16 @@ function spanClass(span: number): string {
 
 function UnknownNode({ type }: { type: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-rose-400/60 bg-rose-500/5 p-3 text-xs text-rose-600 dark:text-rose-400">
-      Unknown component: <code className="font-mono">{type}</code>
+    <div
+      role="presentation"
+      aria-hidden
+      className="flex items-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30 px-4 py-3"
+      title={`Unknown component type: ${type}`}
+    >
+      <svg className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M3 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H3zm2 3h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1 0-1zm0 2.5h4a.5.5 0 0 1 0 1H5a.5.5 0 0 1 0-1z"/>
+      </svg>
+      <span className="text-xs text-muted-foreground/50 font-mono">{type}</span>
     </div>
   );
 }
