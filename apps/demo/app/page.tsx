@@ -52,6 +52,7 @@ export default function Page() {
   const [exportOpen, setExportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -63,6 +64,23 @@ export default function Page() {
       behavior: "smooth",
     });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key === "k") {
+        e.preventDefault();
+        if (!sidebarOpen) setSidebarOpen(true);
+        inputRef.current?.focus();
+      }
+      if (e.key === "Escape" && document.activeElement === inputRef.current) {
+        setInput("");
+        inputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [sidebarOpen]);
 
   const submit = async (text: string) => {
     setInput("");
@@ -212,6 +230,7 @@ export default function Page() {
           >
             <div className="flex items-end gap-3 border-b border-border/80 pb-3 transition-colors focus-within:border-foreground/40">
               <textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
