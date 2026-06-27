@@ -274,12 +274,19 @@ export function buildSystemSegments(opts: {
   return [{ text, cache: true }];
 }
 
+const CONTEXT_CHAR_LIMIT = 15_000;
+
 /** Build the per-request context message describing the current dashboard. */
 export function buildContextMessage(request: AgentRequest): ChatMessage {
   const current = request.dashboard ?? emptyDashboard();
+  const raw = JSON.stringify(current);
+  const json =
+    raw.length > CONTEXT_CHAR_LIMIT
+      ? raw.slice(0, CONTEXT_CHAR_LIMIT) + "\n… (truncated — spec too large)"
+      : raw;
   return {
     role: "user",
-    content: `CURRENT DASHBOARD SPEC:\n\`\`\`json\n${JSON.stringify(current)}\n\`\`\``,
+    content: `CURRENT DASHBOARD SPEC:\n\`\`\`json\n${json}\n\`\`\``,
   };
 }
 

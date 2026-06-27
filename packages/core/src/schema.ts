@@ -132,7 +132,11 @@ export const styleSpecSchema = styleCoreSchema.extend({
   lg: styleCoreSchema.optional(),
   hover: styleCoreSchema.optional(),
   focus: styleCoreSchema.optional(),
-  /** Escape hatch: raw Tailwind classes, appended last. Use sparingly. */
+  /**
+   * Raw Tailwind classes appended last. Only works for classes already
+   * in the Tailwind safelist — novel runtime classes are silently ignored
+   * (Tailwind JIT scans at build time). Prefer first-class StyleSpec tokens.
+   */
   className: z.string().optional(),
 });
 export type StyleSpec = z.infer<typeof styleSpecSchema>;
