@@ -685,18 +685,58 @@ function toPoints(data: unknown): Point[] {
  * Chart: `kind` of "bar" | "line" | "area", `data: {label,value}[]`.
  * Rendered as inline SVG so the library ships no charting dependency.
  */
-export const Chart: RegistryComponent = ({ kind, data, title }) => {
+export const Chart: RegistryComponent = ({ kind, data, title, subtitle }) => {
   const k = oneOf(kind, ["bar", "line", "area"] as const, "bar");
   const points = toPoints(data);
   const titleText = str(title);
+  const subtitleText = str(subtitle);
   const baseLabel = titleText || `${k} chart`;
   const ariaLabel = `${baseLabel}, ${points.length} data ${points.length === 1 ? "point" : "points"}`;
 
+  // Auto-compute trend from first → last value for a subtle indicator.
+  const trendPct = (() => {
+    if (points.length < 2) return null;
+    const first = points[0]!.value;
+    const last = points[points.length - 1]!.value;
+    if (first === 0) return null;
+    return ((last - first) / Math.abs(first)) * 100;
+  })();
+  const trendUp = trendPct !== null && trendPct > 0;
+  const trendDown = trendPct !== null && trendPct < 0;
+
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-3 h-full">
-      {titleText && <h3 className="font-semibold leading-none tracking-tight">{titleText}</h3>}
+      {(titleText || subtitleText) && (
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-0.5">
+            {titleText && (
+              <h3 className="font-semibold text-base leading-none tracking-tight">{titleText}</h3>
+            )}
+            {subtitleText && (
+              <p className="text-xs text-muted-foreground">{subtitleText}</p>
+            )}
+          </div>
+          {trendPct !== null && (
+            <span
+              className={cn(
+                "shrink-0 inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-medium font-tabular",
+                trendUp && "bg-[hsl(var(--success)/0.12)] text-[hsl(var(--success))]",
+                trendDown && "bg-[hsl(var(--danger)/0.12)] text-[hsl(var(--danger))]",
+                !trendUp && !trendDown && "bg-muted text-muted-foreground",
+              )}
+            >
+              {trendUp ? "▲" : trendDown ? "▼" : "—"} {Math.abs(trendPct).toFixed(1)}%
+            </span>
+          )}
+        </div>
+      )}
       {points.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No data</p>
+        <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+          <svg className="h-8 w-8 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5l5-5 4 4 5-7 4 4" />
+          </svg>
+          <p className="text-xs">No data to display</p>
+        </div>
       ) : (
         <ChartBody kind={k} points={points} ariaLabel={ariaLabel} />
       )}
