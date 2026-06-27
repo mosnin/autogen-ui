@@ -674,6 +674,20 @@ interface Point {
   value: number;
 }
 
+interface NamedSeries {
+  name: string;
+  color: string;
+  points: Point[];
+}
+
+const CHART_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+] as const;
+
 function toPoints(data: unknown): Point[] {
   return arr<Record<string, unknown>>(data).map((d, i) => ({
     label: str(d?.label, String(i + 1)),
@@ -681,17 +695,35 @@ function toPoints(data: unknown): Point[] {
   }));
 }
 
+function toNamedSeries(data: unknown, seriesKeys: string[]): NamedSeries[] {
+  const rows = arr<Record<string, unknown>>(data);
+  return seriesKeys.slice(0, 5).map((key, si) => ({
+    name: key,
+    color: CHART_COLORS[si] ?? CHART_COLORS[0],
+    points: rows.map((d, i) => ({
+      label: str(d?.label, String(i + 1)),
+      value: num(d?.[key], 0),
+    })),
+  }));
+}
+
 /**
  * Chart: `kind` of "bar" | "line" | "area", `data: {label,value}[]`.
- * Rendered as inline SVG so the library ships no charting dependency.
+ * For multi-series pass `series: ["key1","key2"]` and wide-format data rows.
+ * Rendered as inline SVG — no charting dependency.
  */
-export const Chart: RegistryComponent = ({ kind, data, title, subtitle }) => {
+export const Chart: RegistryComponent = ({ kind, data, title, subtitle, series }) => {
   const k = oneOf(kind, ["bar", "line", "area"] as const, "bar");
-  const points = toPoints(data);
+  const seriesKeys = arr<string>(series).filter((s): s is string => typeof s === "string");
+  const isMulti = seriesKeys.length > 1;
+  const namedSeries = isMulti ? toNamedSeries(data, seriesKeys) : null;
+  const points = isMulti ? [] : toPoints(data);
   const titleText = str(title);
   const subtitleText = str(subtitle);
   const baseLabel = titleText || `${k} chart`;
-  const ariaLabel = `${baseLabel}, ${points.length} data ${points.length === 1 ? "point" : "points"}`;
+  const ariaLabel = isMulti
+    ? `${baseLabel}, ${seriesKeys.length} series`
+    : `${baseLabel}, ${points.length} data ${points.length === 1 ? "point" : "points"}`;
 
   // Auto-compute trend from first → last value for a subtle indicator.
   const trendPct = (() => {
@@ -730,7 +762,19 @@ export const Chart: RegistryComponent = ({ kind, data, title, subtitle }) => {
           )}
         </div>
       )}
-      {points.length === 0 ? (
+      {isMulti && namedSeries ? (
+        <>
+          <MultiSeriesChartBody kind={k} series={namedSeries} ariaLabel={ariaLabel} />
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+            {namedSeries.map((s) => (
+              <span key={s.name} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                {s.name}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : points.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
           <svg className="h-8 w-8 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5l5-5 4 4 5-7 4 4" />
@@ -743,6 +787,109 @@ export const Chart: RegistryComponent = ({ kind, data, title, subtitle }) => {
     </div>
   );
 };
+
+function MultiSeriesChartBody({
+  kind,
+  series,
+  ariaLabel,
+}: {
+  kind: "bar" | "line" | "area";
+  series: NamedSeries[];
+  ariaLabel: string;
+}): ReactNode {
+  const W = 480;
+  const H = 160;
+  const PAD = 8;
+  const n = series.length;
+  const labels = series[0]?.points.map((p) => p.label) ?? [];
+  const allValues = series.flatMap((s) => s.points.map((p) => p.value));
+  const max = Math.max(...allValues, 1);
+  const innerW = W - PAD * 2;
+  const innerH = H - PAD * 2;
+  const grid = [0.33, 0.66, 1].map((f) => PAD + innerH - innerH * f);
+
+  if (kind === "bar") {
+    const groupW = innerW / labels.length;
+    const barW = (groupW * 0.72) / n;
+    const groupPad = groupW * 0.14;
+    return (
+      <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
+        <title>{ariaLabel}</title>
+        <g aria-hidden>
+          {grid.map((y, i) => (
+            <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
+          ))}
+        </g>
+        {labels.map((label, gi) => (
+          <g key={gi}>
+            {series.map((s, si) => {
+              const val = s.points[gi]?.value ?? 0;
+              const h = (val / max) * innerH;
+              const x = PAD + gi * groupW + groupPad + si * barW;
+              return (
+                <motion.rect
+                  key={si}
+                  x={x}
+                  width={barW * 0.88}
+                  rx={2}
+                  fill={s.color}
+                  opacity={0.9}
+                  initial={{ height: 0, y: PAD + innerH }}
+                  animate={{ height: h, y: PAD + innerH - h }}
+                  transition={{ duration: 0.5, ease: EASE_OUT, delay: gi * 0.04 + si * 0.02 }}
+                />
+              );
+            })}
+            <text x={PAD + gi * groupW + groupW / 2} y={H + 14} textAnchor="middle" className="text-[10px] font-tabular fill-muted-foreground">
+              {label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  const step = labels.length > 1 ? innerW / (labels.length - 1) : 0;
+  return (
+    <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
+      <title>{ariaLabel}</title>
+      <defs>
+        {series.map((s, si) => (
+          <linearGradient key={si} id={`ms-area-${si}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={s.color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={s.color} stopOpacity="0" />
+          </linearGradient>
+        ))}
+      </defs>
+      <g aria-hidden>
+        {grid.map((y, i) => (
+          <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
+        ))}
+      </g>
+      {series.map((s, si) => {
+        const coords = s.points.map((p, i) => ({
+          x: PAD + i * step,
+          y: PAD + innerH - (p.value / max) * innerH,
+        }));
+        const line = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
+        const area = `${line} L${PAD + innerW},${PAD + innerH} L${PAD},${PAD + innerH} Z`;
+        return (
+          <g key={si}>
+            {kind === "area" && (
+              <motion.path d={area} fill={`url(#ms-area-${si})`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
+            )}
+            <motion.path d={line} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: EASE_OUT, delay: si * 0.1 }} />
+          </g>
+        );
+      })}
+      {labels.map((label, i) => (
+        <text key={i} x={PAD + i * step} y={H + 14} textAnchor="middle" className="text-[10px] font-tabular fill-muted-foreground">
+          {label}
+        </text>
+      ))}
+    </svg>
+  );
+}
 
 function ChartBody({
   kind,

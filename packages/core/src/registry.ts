@@ -72,7 +72,7 @@ export const componentCatalog: ComponentDoc[] = [
     type: "Chart",
     description: "Dependency-free SVG chart. Animates on mount and on data change.",
     props:
-      "kind: 'bar'|'line'|'area', data: {label:string,value:number}[], title?: string, span?: 1-12 (default 6)",
+      "kind: 'bar'|'line'|'area', data: {label:string,value:number,...}[], title?: string, subtitle?: string, series?: string[] (for multi-series: list of keys to pluck from each data row), span?: 1-12 (default 6)",
     acceptsChildren: false,
   },
   {
