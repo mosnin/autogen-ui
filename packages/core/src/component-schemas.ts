@@ -394,6 +394,70 @@ export const builtinPropSchemas: ComponentPropSchemas = {
       current: z.number().optional(),
     })
     .passthrough(),
+
+  Metric: z
+    .object({
+      value: stringOrNumber,
+      label: z.string().optional(),
+      prefix: z.string().optional(),
+      suffix: z.string().optional(),
+      description: z.string().optional(),
+      trend: z.enum(["up", "down", "flat"]).optional(),
+      span: spanToken.optional(),
+    })
+    .passthrough(),
+
+  Sparkline: z
+    .object({
+      data: z.array(z.number()),
+      size: z.enum(["sm", "md", "lg"]).optional(),
+      trend: z.boolean().optional(),
+      color: z.string().optional(),
+    })
+    .passthrough(),
+
+  RingProgress: z
+    .object({
+      value: z.number().min(0).max(100),
+      label: z.string().optional(),
+      size: z.enum(["sm", "md", "lg"]).optional(),
+      color: z.string().optional(),
+    })
+    .passthrough(),
+
+  Tag: z
+    .object({
+      label: z.string(),
+      variant: z.enum(["default", "blue", "green", "amber", "red", "purple"]).optional(),
+      removable: z.boolean().optional(),
+    })
+    .passthrough(),
+
+  TagGroup: z
+    .object({
+      tags: z.array(
+        z.union([
+          z.string(),
+          z
+            .object({
+              label: z.string(),
+              variant: z.enum(["default", "blue", "green", "amber", "red", "purple"]).optional(),
+            })
+            .passthrough(),
+        ]),
+      ),
+      variant: z.enum(["default", "blue", "green", "amber", "red", "purple"]).optional(),
+    })
+    .passthrough(),
+
+  EmptyState: z
+    .object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      icon: z.enum(["inbox", "search", "chart", "file", "users", "default"]).optional(),
+      action: z.string().optional(),
+    })
+    .passthrough(),
 };
 
 /* ------------------------------------------------------------------ *
