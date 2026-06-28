@@ -265,7 +265,7 @@ export default function Page() {
       undoStack.current = [...undoStack.current.slice(-7), dashboard];
       setDashboard(seed.dashboard);
     }
-    await sendMessage(`${prompt}. The current layout is a starting point — make it excellent.`);
+    await sendMessage(prompt);
     setCanUndo(undoStack.current.length > 0);
   };
 
