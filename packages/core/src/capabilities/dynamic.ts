@@ -61,17 +61,20 @@ Inside the template, bindings reference \`{{<as>.X}}\` and \`{{<indexAs>}}\`.
 Event actions are rewritten to concrete per-iteration values at expansion.
 
 ### Conditionals — the \`when\` prop (any node)
-Every node accepts \`"when": "<expression>"\`. Falsy → not rendered.
+Every node accepts \`"when": "<expression>"\`. Falsy -> not rendered.
 \`\`\`
 { "id": "detail", "type": "Card", "when": "{{state.selectedId | not}}",
   "props": { "title": "Pick a customer" } }
 \`\`\`
 
 ### Routing — multiple screens
-Use \`Dashboard.screens?: Record<name, UINode>\` for alternate roots. When
-\`state.currentScreen\` matches a screen name, that screen is rendered
-instead of \`root\`. Set with \`{ "type": "navigate", "to": string }\` or use
-\`Link\` with \`to\` instead of \`href\`. Typical use: dashboard ⇄ detail ⇄ settings.
+Add a named screen with \`{ "op": "setScreen", "name": string, "node": UINode }\`.
+Remove one with \`{ "op": "removeScreen", "name": string }\`.
+Set a persistent layout wrapper with \`{ "op": "setLayout", "node": UINode }\` —
+put an Outlet inside it where the active screen renders.
+When \`state.currentScreen\` matches a screen name the renderer shows that screen
+instead of \`root\`. Navigate with \`{ "type": "navigate", "to": string }\` or use
+\`Link\` with \`to\`. Typical use: Home / Detail / Settings pattern.
 
 ### Agent-defined functions — \`defineFunction\`
 Declare a callable function backed by HTTP. Use this when an interaction needs
@@ -110,7 +113,8 @@ to ordered Actions:
 - \`{ "type": "setState", "path": string, "value": JSON }\`
 - \`{ "type": "toggleState", "path": string }\`
 - \`{ "type": "refetch", "sourceId": string }\`
-- \`{ "type": "navigate", "to": string }\`
+- \`{ "type": "navigate", "to": string }\` — push to a named screen
+- \`{ "type": "navigateBack" }\` — pop the screen history stack (back button)
 - \`{ "type": "callFunction", "name": string, "args"?: JSON, "into"?: string,
     "onSuccess"?: Action[], "onError"?: Action[] }\`
 - \`{ "type": "openUrl", "url": string, "newTab"?: boolean }\`
@@ -121,12 +125,14 @@ Use \`{{event.value}}\` (Input onChange), \`{{event.row}}\` / \`{{event.index}}\
 (Table onRowClick) to capture the live value into an action.
 
 Patterns:
-- Filtered list: Input.onChange → setState filter q; ForEach over
-  \`{{data.items | filter:q}}\` (best done via state-aware bindings).
-- Drill-down: Table.onRowClick → setState selectedId; detail Card with
-  \`when: "{{state.selectedId}}"\` shows below.
-- Multi-screen: Link \`to="settings"\` navigates; \`screens.settings\` is the
-  alternate root.
+- Filtered list: Input onChange sets state.q; bind a Table or ForEach source
+  to \`{{data.items | filter:q}}\` to show only matching rows.
+- Drill-down: Table onRowClick sets state.selectedId; a detail Card with
+  \`when: "{{state.selectedId}}"\` appears below. A Button with navigateBack
+  (or Link with \`to\`) returns the user to the list.
+- Multi-screen app: put shared nav in \`dashboard.layout\` with an \`Outlet\`,
+  define each screen in \`dashboard.screens\`, and wire Links with \`to\`.
+  Use \`navigateBack\` on detail screens for a back button.
 - Live data: setDataSource with kind:"ws" or pollMs; bindings update
   automatically.`,
 };

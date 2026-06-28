@@ -22,10 +22,17 @@ Visual: bg / color / borderColor (token: 'background','foreground','card',
 'secondary-foreground','muted','muted-foreground','accent',
 'accent-foreground','border','transparent'),
 borderWidth (0|1|2), rounded ('none'|'sm'|'md'|'lg'|'xl'|'2xl'|'full'),
-shadow ('none'|'sm'|'md'|'lg'|'xl'), opacity (0-100).
+shadow ('none'|'sm'|'md'|'lg'|'xl'), opacity (0-100),
+blur ('none'|'sm'|'md'|'lg'|'xl'|'2xl'), glass (boolean — frosted glass backdrop),
+gradient ('to-r'|'to-b'|'to-br'|'to-t'|'to-tr'|'to-bl'),
+gradientFrom / gradientTo (colorToken — gradient endpoints),
+ring ('none'|'1'|'2'|'4'), ringColor (colorToken).
 Typography: fontSize ('xs'|'sm'|'base'|'lg'|'xl'|'2xl'|'3xl'|'4xl'),
 fontWeight ('normal'|'medium'|'semibold'|'bold'),
-textAlign ('left'|'center'|'right'), italic (boolean), truncate (boolean).
+textAlign ('left'|'center'|'right'), italic (boolean), truncate (boolean),
+letterSpacing ('tighter'|'tight'|'normal'|'wide'|'wider'|'widest'),
+lineHeight ('none'|'tight'|'snug'|'normal'|'relaxed'|'loose'),
+textTransform ('uppercase'|'lowercase'|'capitalize'|'normal-case').
 Grid width: **span (1-12)** sizes the node within the parent Grid — set it
 on any node placed in a Grid.
 Responsive/state: nest a partial StyleSpec under \`sm\`, \`md\`, \`lg\` for

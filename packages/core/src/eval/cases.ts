@@ -301,4 +301,76 @@ export const goldenCases: EvalCase[] = [
       return calloutFound ? null : "expected a Callout to surface the key insight — Callout is specifically for actionable, prominent messages";
     },
   },
+  {
+    name: "interactive: multi-screen app has navigate actions",
+    messages: [
+      {
+        role: "user",
+        content: "Build a two-screen app: a Home dashboard and a Settings screen. Include navigation between them.",
+      },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      if (result.patches.length === 0) return "expected patches";
+      let hasNavigate = false;
+      function walkEvents(node: { type?: string; events?: Record<string, unknown[]>; children?: typeof node[] }) {
+        if (node.events) {
+          for (const actions of Object.values(node.events)) {
+            for (const action of actions) {
+              const a = action as { type?: string };
+              if (a.type === "navigate" || a.type === "navigateBack") hasNavigate = true;
+            }
+          }
+        }
+        for (const child of node.children ?? []) walkEvents(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walkEvents(p.node);
+        if (p.op === "append") walkEvents(p.node);
+        if (p.op === "replace") walkEvents(p.node);
+        if (p.op === "setEvents") {
+          const evts = (p as { events?: Record<string, unknown[]> }).events ?? {};
+          for (const actions of Object.values(evts)) {
+            for (const action of actions) {
+              const a = action as { type?: string };
+              if (a.type === "navigate" || a.type === "navigateBack") hasNavigate = true;
+            }
+          }
+        }
+      }
+      return hasNavigate ? null : "expected navigate action(s) for a multi-screen app — use Link with `to` or events with type:\"navigate\"";
+    },
+  },
+  {
+    name: "interactive: ForEach loop renders list with bindings",
+    messages: [
+      {
+        role: "user",
+        content: "Build a customer list that uses a ForEach loop to render each customer row from data.customers.",
+      },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      if (result.patches.length === 0) return "expected patches";
+      let hasForEach = false;
+      let forEachHasChild = false;
+      function walk(node: { type?: string; props?: Record<string, unknown>; children?: typeof node[] }) {
+        if (node.type === "ForEach") {
+          hasForEach = true;
+          if ((node.children?.length ?? 0) > 0) forEachHasChild = true;
+        }
+        for (const child of node.children ?? []) walk(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walk(p.node);
+        if (p.op === "append") walk(p.node);
+        if (p.op === "replace") walk(p.node);
+      }
+      if (!hasForEach) return "expected a ForEach node for the list — ForEach renders one template child per item";
+      if (!forEachHasChild) return "ForEach must have exactly one template child";
+      return null;
+    },
+  },
 ];

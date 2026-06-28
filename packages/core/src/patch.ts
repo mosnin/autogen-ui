@@ -172,6 +172,18 @@ export function applyPatch(dashboard: Dashboard, patch: Patch): Dashboard {
     case "setState":
       return { ...dashboard, state: setPath(dashboard.state, patch.path, patch.value) as Dashboard["state"] };
 
+    case "setScreen":
+      return { ...dashboard, screens: { ...(dashboard.screens ?? {}), [patch.name]: patch.node } };
+
+    case "removeScreen": {
+      const screens = { ...(dashboard.screens ?? {}) };
+      delete screens[patch.name];
+      return { ...dashboard, screens: Object.keys(screens).length > 0 ? screens : undefined };
+    }
+
+    case "setLayout":
+      return { ...dashboard, layout: patch.node ?? undefined };
+
     default:
       return dashboard;
   }

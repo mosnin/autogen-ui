@@ -73,9 +73,9 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
-    name: "multi-screen-app (screens + layout + icons)",
+    name: "multi-screen-app (setScreen + setLayout + Outlet + navigate)",
     turns: [
-      "Build an admin app with three screens (Home, Analytics, Settings) using a persistent layout with a sidebar and an Outlet. Put an Icon next to each nav item and wire navigation.",
+      "Build an admin app with three screens (Home, Analytics, Settings) using setScreen for each screen and setLayout for a persistent sidebar layout with an Outlet. Put an Icon next to each nav item and wire navigate actions.",
     ],
   },
   {
@@ -100,6 +100,18 @@ const SCENARIOS: Scenario[] = [
     name: "activity-flow (Timeline + Stepper + bento layout)",
     turns: [
       "Build an onboarding dashboard with a Stepper showing progress through 4 steps, a Timeline of recent account events, and a bento-layout hero card with a welcome Metric.",
+    ],
+  },
+  {
+    name: "foreach-drill-down (ForEach + bindings + navigate + navigateBack)",
+    turns: [
+      "Build a customer roster using a ForEach loop over data.customers (each has name, role, email, status). Clicking a row navigates to a detail screen showing that customer's info. The detail screen has a Back button using navigateBack.",
+    ],
+  },
+  {
+    name: "glass-gradient-hero (advanced styling: blur + glass + gradient + typography)",
+    turns: [
+      "Build a landing-page hero section with a frosted glass card over a gradient background. Use large heading, muted subtext, and a prominent CTA button. Apply glass:true, blur, and gradient styling via the StyleSpec.",
     ],
   },
 ];

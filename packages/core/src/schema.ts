@@ -404,6 +404,10 @@ export const patchSchema = z.discriminatedUnion("op", [
     bindings: z.record(z.string()).nullable(),
   }),
   z.object({ op: z.literal("setEvents"), id: z.string(), events: eventMapSchema.nullable() }),
+  // multi-screen routing (Phase 4)
+  z.object({ op: z.literal("setScreen"), name: z.string(), node: uiNodeSchema }),
+  z.object({ op: z.literal("removeScreen"), name: z.string() }),
+  z.object({ op: z.literal("setLayout"), node: uiNodeSchema.nullable() }),
 ]);
 export type Patch = z.infer<typeof patchSchema>;
 export type PatchOp = Patch["op"];

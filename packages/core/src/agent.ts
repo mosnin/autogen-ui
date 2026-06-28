@@ -198,6 +198,9 @@ Style/motion: setStyle{id,style|null}, setMotion{id,motion|null}, setTheme{theme
 Components: defineComponent{def}, removeComponent{name}
 Data/behaviour: setDataSource{source}, removeDataSource{id},
   setState{path,value}, setBindings{id,bindings|null}, setEvents{id,events|null}
+Multi-screen routing: setScreen{name,node} — add/replace a named screen,
+  removeScreen{name} — drop a screen,
+  setLayout{node|null} — set the persistent layout wrapper (put an Outlet inside it)
 
 A UINode is { id, type, props?, bindings?, style?, motion?, events?, children? }.`;
 
@@ -280,7 +283,7 @@ OPINIONS (these encode taste, not just correctness):
 11. Use EmptyState when a section has no data yet. Use TagGroup for category filters,
     labels, and multi-value selections — it shows range. Use Timeline for activity
     feeds, audit logs, and step-by-step processes. Use Stepper for onboarding flows,
-    setup checklists, and any numbered multi-step sequence — always set `current`
+    setup checklists, and any numbered multi-step sequence — always set \`current\`
     to the active step index. Use Callout to highlight one important insight per
     section (info/success/warning/error).
 
