@@ -39,7 +39,7 @@ const EXAMPLES: Record<
     children: [{ id: "card-inner", type: "Stat", props: { label: "p50", value: "84ms" } }],
   },
   Stat: {
-    props: { label: "Revenue", value: "$84,210", delta: "+12%", trend: "up" },
+    props: { label: "Revenue", value: "$84,210", delta: "+12%", trend: "up", sparkline: [58, 63, 71, 74, 78, 81, 84] },
   },
   Chart: {
     props: {
@@ -171,6 +171,49 @@ const EXAMPLES: Record<
     props: { text: "Premature optimization is the root of all evil.", author: "Donald Knuth" },
   },
   Kbd: { props: { keys: "Ctrl + K" } },
+  Metric: {
+    props: { label: "Monthly Revenue", value: "$248,479", suffix: "", description: "+18.3% vs last month", trend: "up" },
+  },
+  Sparkline: {
+    props: { data: [40, 55, 48, 62, 58, 71, 80], size: "md" },
+  },
+  RingProgress: {
+    props: { value: 72, label: "NPS Score", size: "md" },
+  },
+  Timeline: {
+    props: {
+      items: [
+        { id: "t1", title: "Enterprise upgrade", description: "Acme Corp → $2,400/mo", timestamp: "2h ago", status: "done" },
+        { id: "t2", title: "Churn alert", description: "3 accounts at risk", timestamp: "5h ago", status: "current" },
+        { id: "t3", title: "Billing closed", description: "$1.24M collected", timestamp: "Yesterday", status: "done" },
+      ],
+    },
+  },
+  Callout: {
+    props: { variant: "success", title: "All systems operational", content: "P99 latency is under 80ms. No incidents in the past 30 days." },
+  },
+  Stepper: {
+    props: {
+      steps: ["Connect data", "Configure layout", "Publish", "Monitor"],
+      current: 1,
+    },
+  },
+  Tag: {
+    props: { label: "Enterprise", variant: "blue" },
+  },
+  TagGroup: {
+    props: {
+      tags: [
+        { label: "Electronics", variant: "blue" },
+        { label: "Apparel", variant: "purple" },
+        { label: "Sports", variant: "amber" },
+        { label: "Home", variant: "green" },
+      ],
+    },
+  },
+  EmptyState: {
+    props: { title: "No results found", description: "Try adjusting your filters or search terms.", icon: "search", action: "Clear filters" },
+  },
 };
 
 function buildDemoSpec(doc: ComponentDoc): DemoSpec {

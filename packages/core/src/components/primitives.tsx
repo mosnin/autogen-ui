@@ -1056,9 +1056,16 @@ function PieChartBody({
         />
       ))}
       {hovered !== null && slices[hovered] && (
-        <text x={CX} y={CY + 5} textAnchor="middle" className="text-[11px] font-tabular fill-foreground" fontSize="11">
-          {slices[hovered]!.pct}%
-        </text>
+        <>
+          <text x={CX} y={donut ? CY - 4 : CY + 5} textAnchor="middle" className="text-[11px] font-tabular font-semibold fill-foreground" fontSize="11">
+            {slices[hovered]!.pct}%
+          </text>
+          {donut && (
+            <text x={CX} y={CY + 10} textAnchor="middle" className="text-[9px] fill-muted-foreground" fontSize="9">
+              {slices[hovered]!.label}
+            </text>
+          )}
+        </>
       )}
     </svg>
   );
