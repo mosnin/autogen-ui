@@ -1259,8 +1259,8 @@ function ChartBody({
         {tooltip}
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${W} ${H + 20}`}
-          className="w-full h-auto"
+          viewBox={`-40 0 ${W + 40} ${H + 20}`}
+          className="w-full h-auto cursor-crosshair"
           role="img"
           aria-label={ariaLabel}
           onMouseMove={onMove}
@@ -1274,6 +1274,11 @@ function ChartBody({
             </linearGradient>
           </defs>
           {gridLines}
+          {grid.map((y, i) => (
+            <text key={i} x={-4} y={y + 3} textAnchor="end" className="text-[9px] font-tabular fill-muted-foreground/60" fontSize="9">
+              {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
+            </text>
+          ))}
           {points.map((p, i) => {
             const h = (p.value / max) * innerH;
             const isHover = hovered === i;
@@ -1322,8 +1327,8 @@ function ChartBody({
       {tooltip}
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H + 20}`}
-        className="w-full h-auto"
+        viewBox={`-40 0 ${W + 40} ${H + 20}`}
+        className="w-full h-auto cursor-crosshair"
         role="img"
         aria-label={ariaLabel}
         onMouseMove={onMove}
@@ -1337,6 +1342,11 @@ function ChartBody({
           </linearGradient>
         </defs>
         {gridLines}
+        {grid.map((y, i) => (
+          <text key={i} x={-4} y={y + 3} textAnchor="end" className="text-[9px] font-tabular fill-muted-foreground/60" fontSize="9">
+            {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
+          </text>
+        ))}
         {hoveredCoord && (
           <line
             x1={hoveredCoord.x}

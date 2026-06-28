@@ -148,6 +148,7 @@ export default function Page() {
   const [phIdx, setPhIdx] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
   const [statusIdx, setStatusIdx] = useState(0);
+  const [helpOpen, setHelpOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -197,9 +198,14 @@ export default function Page() {
         if (!sidebarOpen) setSidebarOpen(true);
         inputRef.current?.focus();
       }
-      if (e.key === "Escape" && document.activeElement === inputRef.current) {
-        setInput("");
-        inputRef.current?.blur();
+      if (e.key === "Escape") {
+        if (helpOpen) { setHelpOpen(false); return; }
+        if (menuOpen) { setMenuOpen(false); return; }
+        if (exportOpen) { setExportOpen(false); return; }
+        if (document.activeElement === inputRef.current) {
+          setInput("");
+          inputRef.current?.blur();
+        }
       }
       // ⌘Z undo
       if (meta && e.key === "z" && !e.shiftKey) {
@@ -210,10 +216,23 @@ export default function Page() {
           setCanUndo(undoStack.current.length > 0);
         }
       }
+      // ? opens help overlay (when not typing)
+      if (e.key === "?" && document.activeElement !== inputRef.current) {
+        e.preventDefault();
+        setHelpOpen((o) => !o);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [sidebarOpen, setDashboard]);
+  }, [sidebarOpen, setDashboard, helpOpen, menuOpen, exportOpen]);
+
+  // Auto-resize textarea as user types
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
 
   // Cycle placeholder while input is empty and unfocused
   useEffect(() => {
@@ -330,7 +349,11 @@ export default function Page() {
                 </button>
               )}
               <button
-                onClick={reset}
+                onClick={() => {
+                  undoStack.current = [];
+                  setCanUndo(false);
+                  reset();
+                }}
                 className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 Start over
@@ -740,6 +763,58 @@ export default function Page() {
                   </div>
                 </>
               )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Keyboard shortcut help overlay */}
+      <AnimatePresence>
+        {helpOpen && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Close"
+              onClick={() => setHelpOpen(false)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-30 bg-background/50 backdrop-blur-sm"
+            />
+            <motion.div
+              role="dialog"
+              aria-label="Keyboard shortcuts"
+              initial={{ opacity: 0, scale: 0.97, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 4 }}
+              transition={{ duration: 0.25, ease: SLOW as never }}
+              className="fixed left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 w-80 rounded-2xl border border-border/60 bg-card p-6 shadow-lift"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <span className="font-display text-[14px] font-medium tracking-tight">Keyboard shortcuts</span>
+                <button
+                  onClick={() => setHelpOpen(false)}
+                  className="text-[11px] text-muted-foreground/50 hover:text-foreground transition-colors"
+                >
+                  Esc
+                </button>
+              </div>
+              <div className="space-y-2.5">
+                {[
+                  { keys: "↵", desc: "Send message" },
+                  { keys: "⇧↵", desc: "New line in input" },
+                  { keys: "⌘K", desc: "Focus input" },
+                  { keys: "Esc", desc: "Clear input" },
+                  { keys: "⌘Z", desc: "Undo last generation" },
+                  { keys: "?", desc: "Toggle this help" },
+                ].map(({ keys, desc }) => (
+                  <div key={keys} className="flex items-center justify-between">
+                    <span className="text-[12px] text-muted-foreground">{desc}</span>
+                    <kbd className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">{keys}</kbd>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           </>
         )}
