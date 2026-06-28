@@ -75,6 +75,9 @@ const DEFAULT_SPAN: Record<string, number> = {
   Tag: 2,
   TagGroup: 6,
   EmptyState: 12,
+  Timeline: 6,
+  Callout: 12,
+  Stepper: 12,
 };
 
 /** Substitute the first `Outlet` node in `layout` with `screen`. */
