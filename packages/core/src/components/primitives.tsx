@@ -171,9 +171,9 @@ function SparklineSVG({
   );
 }
 
-/** Reusable by StatSparkline (backward compat). */
+/** Reusable by Stat — shows trend-colored mini line. */
 function StatSparkline({ data }: { data: number[] }) {
-  return <SparklineSVG data={data} sizeClass="h-5 w-20" color="hsl(var(--chart-1))" trend={false} />;
+  return <SparklineSVG data={data} sizeClass="h-5 w-20" color="hsl(var(--chart-1))" trend={true} />;
 }
 
 /** Standalone sparkline component — inline trend line from a number array. */
