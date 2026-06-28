@@ -40,6 +40,8 @@ const SPAN_MAP: Record<number, string> = {
 
 const DEFAULT_SPAN: Record<string, number> = {
   Stat: 3,
+  Metric: 6,
+  Sparkline: 3,
   Card: 4,
   Chart: 6,
   Table: 12,
@@ -64,11 +66,15 @@ const DEFAULT_SPAN: Record<string, number> = {
   Tooltip: 3,
   Avatar: 2,
   Skeleton: 6,
+  RingProgress: 3,
   CodeBlock: 12,
   Quote: 12,
   Kbd: 2,
   ForEach: 12,
   Outlet: 12,
+  Tag: 2,
+  TagGroup: 6,
+  EmptyState: 12,
 };
 
 /** Substitute the first `Outlet` node in `layout` with `screen`. */
@@ -84,20 +90,71 @@ function replaceOutlet(layout: UINode, screen: UINode): UINode {
   return changed ? { ...layout, children: nextChildren } : layout;
 }
 
-/** The grid-span wrapper class is structural and owned by the renderer. */
-function spanClass(node: UINode): string {
+/** Compute the col-span for a child node, considering parent layout preset. */
+function resolveSpan(
+  node: UINode,
+  siblingIndex: number,
+  _siblingCount: number,
+  parentPreset?: string,
+): number {
+  // Explicit style.span or props.span always wins.
   const raw = node.style?.span ?? node.props?.span;
-  const span =
-    typeof raw === "number" && raw >= 1 && raw <= 12
-      ? Math.round(raw)
-      : (DEFAULT_SPAN[node.type] ?? 4);
+  if (typeof raw === "number" && raw >= 1 && raw <= 12) return Math.round(raw);
+
+  // Apply archetype distribution if parent has a preset.
+  if (parentPreset) {
+    switch (parentPreset) {
+      case "bento": {
+        // First child is hero (8), second is sidebar (4), rest alternate: wide(8)/narrow(4)
+        if (siblingIndex === 0) return 8;
+        if (siblingIndex === 1) return 4;
+        return siblingIndex % 2 === 0 ? 8 : 4;
+      }
+      case "split": {
+        // Alternating 7/5 split — content + detail pane
+        return siblingIndex % 2 === 0 ? 7 : 5;
+      }
+      case "thirds": {
+        // Equal thirds
+        return 4;
+      }
+      case "hero": {
+        // First child is full-width hero, rest are 4-col cards
+        return siblingIndex === 0 ? 12 : 4;
+      }
+      case "sidebar-detail": {
+        // Narrow sidebar (3) + wide detail (9)
+        return siblingIndex % 2 === 0 ? 3 : 9;
+      }
+      case "feed": {
+        // Feed: all items full width for legibility
+        return 12;
+      }
+      default:
+        break;
+    }
+  }
+
+  return DEFAULT_SPAN[node.type] ?? 4;
+}
+
+/** The grid-span wrapper class is structural and owned by the renderer. */
+function spanClass(span: number): string {
   return SPAN_MAP[span] ?? SPAN_MAP[4]!;
 }
 
 function UnknownNode({ type }: { type: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-rose-400/60 bg-rose-500/5 p-3 text-xs text-rose-600 dark:text-rose-400">
-      Unknown component: <code className="font-mono">{type}</code>
+    <div
+      role="presentation"
+      aria-hidden
+      className="flex items-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30 px-4 py-3"
+      title={`Unknown component type: ${type}`}
+    >
+      <svg className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M3 3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H3zm2 3h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1 0-1zm0 2.5h4a.5.5 0 0 1 0 1H5a.5.5 0 0 1 0-1z"/>
+      </svg>
+      <span className="text-xs text-muted-foreground/50 font-mono">{type}</span>
     </div>
   );
 }
@@ -123,6 +180,10 @@ interface RenderNodeProps {
   isRoot?: boolean;
   /** Sibling index within the parent, used for stagger. */
   siblingIndex?: number;
+  /** Layout preset of the parent node (e.g. "bento", "split"). */
+  parentPreset?: string;
+  /** Total number of siblings in parent (for context-aware distribution). */
+  siblingCount?: number;
 }
 
 function RenderNode({
@@ -132,6 +193,8 @@ function RenderNode({
   ctx,
   isRoot,
   siblingIndex = 0,
+  parentPreset,
+  siblingCount = 1,
 }: RenderNodeProps) {
   // Iteration scope: ForEach expansion writes `_scope` into the cloned
   // child's props; push it into ctx before binding resolution + render.
@@ -151,6 +214,10 @@ function RenderNode({
 
   const Comp = registry[node.type];
 
+  const childPreset =
+    typeof node.props?.layoutPreset === "string" ? node.props.layoutPreset : undefined;
+  const childCount = node.children?.length ?? 0;
+
   const renderedChildren =
     node.children && node.children.length > 0 ? (
       <AnimatePresence mode="popLayout" initial={false}>
@@ -162,6 +229,8 @@ function RenderNode({
             ext={ext}
             ctx={scopedCtx}
             siblingIndex={i}
+            parentPreset={childPreset}
+            siblingCount={childCount}
           />
         ))}
       </AnimatePresence>
@@ -182,13 +251,26 @@ function RenderNode({
   const compiledMotion = node.motion ? ext.compileMotion(node.motion) : {};
   const handlers = node.events ? ext.compileEvents(node.events, scopedCtx) : {};
 
+  // Choreograph entrances by visual weight: large structural nodes rise
+  // slower and further; compact nodes (stats, badges) snap in quickly.
+  const span = resolveSpan(node, siblingIndex, siblingCount, parentPreset);
+  const isLarge = span >= 8;
+  const isCompact = ["Badge", "Button", "Kbd", "Tooltip", "Switch", "Checkbox"].includes(node.type);
+  const entranceDuration = isCompact ? 0.28 : isLarge ? ENTRANCE_DURATION * 1.1 : ENTRANCE_DURATION;
+  const entranceY = isCompact ? 6 : isLarge ? 20 : 12;
+  const entranceScale = isCompact ? 1 : isLarge ? 0.96 : 0.97;
+
   return (
     <motion.div
       layout
       layoutId={node.id}
-      className={cn(spanClass(node), "min-w-0", compiledStyle.className)}
+      className={cn(
+        spanClass(span),
+        "min-w-0",
+        compiledStyle.className,
+      )}
       style={compiledStyle.style}
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      initial={{ opacity: 0, y: entranceY, scale: entranceScale }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{
         opacity: 0,
@@ -196,7 +278,7 @@ function RenderNode({
         transition: { duration: 0.18, ease: EASE_EXIT },
       }}
       transition={{
-        duration: ENTRANCE_DURATION,
+        duration: entranceDuration,
         ease: EASE_OUT,
         delay: (siblingIndex * STAGGER_MS) / 1000,
         layout: { duration: 0.32, ease: EASE_OUT },

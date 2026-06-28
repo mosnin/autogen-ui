@@ -4,6 +4,7 @@ import {
   BrandProvider,
   DashboardRenderer,
   brandPresets,
+  cn,
   useRuntime,
   useStreamingDashboard,
   type BrandPresetName,
@@ -45,10 +46,17 @@ export default function Page() {
   const { data, state, dispatch } = useRuntime(dashboard);
   const [input, setInput] = useState("");
   const [brandName, setBrandName] = useState<BrandPresetName>("violet");
+  const [dark, setDark] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -56,6 +64,23 @@ export default function Page() {
       behavior: "smooth",
     });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key === "k") {
+        e.preventDefault();
+        if (!sidebarOpen) setSidebarOpen(true);
+        inputRef.current?.focus();
+      }
+      if (e.key === "Escape" && document.activeElement === inputRef.current) {
+        setInput("");
+        inputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [sidebarOpen]);
 
   const submit = async (text: string) => {
     setInput("");
@@ -105,6 +130,23 @@ export default function Page() {
           )}
           <button
             type="button"
+            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+            onClick={() => setDark((d) => !d)}
+            className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {dark ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
             aria-label="Options"
             onClick={() => setMenuOpen((o) => !o)}
             className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
@@ -120,7 +162,11 @@ export default function Page() {
 
       <div className="flex min-h-0 flex-1">
         {/* Conversation */}
-        <aside className="flex w-[440px] flex-col">
+        <aside className={cn(
+          "flex flex-col transition-all duration-300",
+          sidebarOpen ? "w-[440px] min-w-[280px]" : "w-0 overflow-hidden",
+          "md:flex",
+        )}>
           <div
             ref={scrollRef}
             className="flex-1 space-y-6 overflow-y-auto px-8 pb-6"
@@ -159,15 +205,15 @@ export default function Page() {
             )}
 
             {isLoading && (
-              <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="h-1 w-1 rounded-full bg-foreground/30 animate-thinking"
-                    style={{ animationDelay: `${i * 0.18}s` }}
-                  />
-                ))}
-              </div>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="text-[13px] text-muted-foreground/60 italic"
+              >
+                Building…
+              </motion.p>
             )}
 
             {error && (
@@ -184,6 +230,7 @@ export default function Page() {
           >
             <div className="flex items-end gap-3 border-b border-border/80 pb-3 transition-colors focus-within:border-foreground/40">
               <textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -210,6 +257,35 @@ export default function Page() {
 
         {/* Canvas */}
         <section className="relative min-w-0 flex-1 overflow-y-auto">
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div
+                key="loading-bar"
+                className="absolute inset-x-0 top-0 z-20 h-[2px] origin-left bg-primary/60"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 0.85 }}
+                exit={{ scaleX: 1, opacity: 0 }}
+                transition={{
+                  scaleX: { duration: 8, ease: [0.1, 0.4, 0.6, 1] },
+                  opacity: { duration: 0.3 },
+                }}
+              />
+            )}
+          </AnimatePresence>
+          <button
+            type="button"
+            aria-label={sidebarOpen ? "Hide conversation" : "Show conversation"}
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="absolute left-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground md:hidden"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              {sidebarOpen ? (
+                <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+              ) : (
+                <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>
+              )}
+            </svg>
+          </button>
           <div className="relative px-12 pb-16 pt-8">
             <AnimatePresence mode="wait">
               {isEmpty ? (
@@ -310,7 +386,7 @@ export default function Page() {
               <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
                 Theme
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-4 gap-2">
                 {(Object.keys(brandPresets) as BrandPresetName[]).map((n) => (
                   <button
                     key={n}

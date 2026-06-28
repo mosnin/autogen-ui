@@ -16,85 +16,109 @@ export const revenueSeed: Dashboard = {
   root: {
     id: id("root"),
     type: "Grid",
-    props: { gap: 6 },
+    props: { gap: 6, layoutPreset: "bento" },
     children: [
       {
-        id: "mrr",
-        type: "Stat",
-        props: {
-          label: "MRR",
-          value: 248420,
-          delta: "+12.4% vs Q3",
-          trend: "up",
-          sparkline: [180, 195, 210, 218, 232, 241, 248],
-        },
-        style: { span: 3 },
-      },
-      {
-        id: "arr",
-        type: "Stat",
-        props: {
-          label: "ARR",
-          value: 2981040,
-          delta: "+18% YoY",
-          trend: "up",
-          sparkline: [2400, 2520, 2650, 2780, 2860, 2920, 2981],
-        },
-        style: { span: 3 },
-      },
-      {
-        id: "churn",
-        type: "Stat",
-        props: {
-          label: "Net Churn",
-          value: "2.1%",
-          delta: "-0.4pp",
-          trend: "down",
-          sparkline: [3.2, 3.0, 2.8, 2.6, 2.5, 2.3, 2.1],
-        },
-        style: { span: 3 },
-      },
-      {
-        id: "active",
-        type: "Stat",
-        props: {
-          label: "Active Users",
-          value: 18420,
-          delta: "+1,204 this week",
-          trend: "up",
-          sparkline: [15.1, 15.8, 16.3, 16.9, 17.4, 17.9, 18.4],
-        },
-        style: { span: 3 },
-      },
-      {
-        id: "growth",
-        type: "Chart",
-        props: {
-          kind: "area",
-          title: "MRR growth",
-          data: [
-            { label: "Jul", value: 180 },
-            { label: "Aug", value: 195 },
-            { label: "Sep", value: 210 },
-            { label: "Oct", value: 232 },
-            { label: "Nov", value: 241 },
-            { label: "Dec", value: 248 },
-          ],
-        },
+        id: "mrr-hero",
+        type: "Card",
+        props: { title: "Monthly Recurring Revenue", description: "Net new + expansion" },
         style: { span: 8 },
+        children: [
+          {
+            id: "mrr-chart",
+            type: "Chart",
+            props: {
+              kind: "area",
+              title: "MRR",
+              subtitle: "+12.4% since Q3",
+              data: [
+                { label: "Jul", value: 180 },
+                { label: "Aug", value: 195 },
+                { label: "Sep", value: 210 },
+                { label: "Oct", value: 232 },
+                { label: "Nov", value: 241 },
+                { label: "Dec", value: 248 },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        id: "kpi-stack",
+        type: "Stack",
+        props: { direction: "col", gap: 4 },
+        style: { span: 4 },
+        children: [
+          {
+            id: "mrr-stat",
+            type: "Stat",
+            props: {
+              label: "MRR",
+              value: "$248,420",
+              delta: "+12.4% vs Q3",
+              trend: "up",
+              sparkline: [180, 195, 210, 218, 232, 241, 248],
+            },
+          },
+          {
+            id: "arr-stat",
+            type: "Stat",
+            props: {
+              label: "ARR",
+              value: "$2.98M",
+              delta: "+18% YoY",
+              trend: "up",
+            },
+          },
+          {
+            id: "churn-stat",
+            type: "Stat",
+            props: {
+              label: "Net Churn",
+              value: "2.1%",
+              delta: "−0.4pp",
+              trend: "down",
+              sparkline: [3.2, 3.0, 2.8, 2.6, 2.5, 2.3, 2.1],
+            },
+          },
+        ],
       },
       {
         id: "channels",
         type: "Chart",
         props: {
           kind: "bar",
-          title: "Signups by source",
+          title: "Signups by channel",
+          subtitle: "Last 30 days",
           data: [
             { label: "Organic", value: 420 },
             { label: "Paid", value: 280 },
             { label: "Referral", value: 190 },
             { label: "Partner", value: 95 },
           ],
+        },
+        style: { span: 4 },
+      },
+      {
+        id: "active-stat",
+        type: "Stat",
+        props: {
+          label: "Active Users",
+          value: "18,420",
+          delta: "+1,204 this week",
+          trend: "up",
+          sparkline: [15.1, 15.8, 16.3, 16.9, 17.4, 17.9, 18.4],
+        },
+        style: { span: 4 },
+      },
+      {
+        id: "expansion-callout",
+        type: "Callout",
+        props: {
+          intent: "success",
+          title: "Expansion revenue up 31%",
+          message:
+            "Upsells to Enterprise plan are outpacing new logo growth. Consider doubling down on in-app upgrade prompts.",
         },
         style: { span: 4 },
       },
@@ -110,11 +134,11 @@ export const revenueSeed: Dashboard = {
             props: {
               columns: ["Company", "Plan", "MRR", "Signed up"],
               rows: [
-                ["Acme Corp", "Enterprise", 1499, "2 hours ago"],
-                ["Nova Labs", "Team", 299, "Yesterday"],
-                ["Pulse Health", "Team", 299, "2 days ago"],
-                ["Atlas Pay", "Pro", 99, "3 days ago"],
-                ["Cobalt Inc", "Pro", 99, "5 days ago"],
+                ["Acme Corp", "Enterprise", "$1,499", "2 hours ago"],
+                ["Nova Labs", "Team", "$299", "Yesterday"],
+                ["Pulse Health", "Team", "$299", "2 days ago"],
+                ["Atlas Pay", "Pro", "$99", "3 days ago"],
+                ["Cobalt Inc", "Pro", "$99", "5 days ago"],
               ],
             },
           },
@@ -143,7 +167,7 @@ export const fitnessSeed: Dashboard = {
         type: "Stat",
         props: {
           label: "Steps",
-          value: 64280,
+          value: "64,280",
           delta: "+8% vs last week",
           trend: "up",
           sparkline: [8200, 9100, 7800, 10200, 9400, 11800, 7780],
@@ -155,7 +179,7 @@ export const fitnessSeed: Dashboard = {
         type: "Stat",
         props: {
           label: "Active minutes",
-          value: 412,
+          value: "412",
           delta: "+24 min",
           trend: "up",
           sparkline: [48, 62, 51, 78, 64, 89, 60],
@@ -168,7 +192,7 @@ export const fitnessSeed: Dashboard = {
         props: {
           label: "Sleep avg",
           value: "7h 24m",
-          delta: "-12 min",
+          delta: "−12 min",
           trend: "down",
         },
         style: { span: 3 },
@@ -178,19 +202,30 @@ export const fitnessSeed: Dashboard = {
         type: "Stat",
         props: {
           label: "Resting HR",
-          value: 58,
-          delta: "-2 bpm",
+          value: "58 bpm",
+          delta: "−2 bpm",
           trend: "down",
           sparkline: [62, 61, 60, 59, 59, 58, 58],
         },
         style: { span: 3 },
       },
       {
+        id: "recovery-callout",
+        type: "Callout",
+        props: {
+          intent: "warning",
+          title: "Recovery score low today",
+          message: "HRV is 14% below your baseline. Consider a rest day or light activity only.",
+        },
+        style: { span: 12 },
+      },
+      {
         id: "activity",
         type: "Chart",
         props: {
           kind: "bar",
-          title: "Activity this week",
+          title: "Active minutes by day",
+          subtitle: "Mon–Sun",
           data: [
             { label: "Mon", value: 48 },
             { label: "Tue", value: 62 },
@@ -201,7 +236,44 @@ export const fitnessSeed: Dashboard = {
             { label: "Sun", value: 60 },
           ],
         },
-        style: { span: 12 },
+        style: { span: 8 },
+      },
+      {
+        id: "workouts-timeline",
+        type: "Timeline",
+        style: { span: 4 },
+        props: {
+          items: [
+            {
+              id: "w1",
+              title: "Tempo run",
+              description: "5.2 km · 28 min",
+              timestamp: "Today, 7:14 AM",
+              icon: "🏃",
+            },
+            {
+              id: "w2",
+              title: "Weight training",
+              description: "Upper body · 52 min",
+              timestamp: "Yesterday",
+              icon: "🏋️",
+            },
+            {
+              id: "w3",
+              title: "Yoga",
+              description: "Flexibility · 30 min",
+              timestamp: "2 days ago",
+              icon: "🧘",
+            },
+            {
+              id: "w4",
+              title: "Rest day",
+              description: "Active recovery walk",
+              timestamp: "3 days ago",
+              icon: "🚶",
+            },
+          ],
+        },
       },
     ],
   },
@@ -219,14 +291,35 @@ export const contentSeed: Dashboard = {
   root: {
     id: "root",
     type: "Grid",
-    props: { gap: 6 },
+    props: { gap: 6, layoutPreset: "hero" },
     children: [
+      {
+        id: "trend-hero",
+        type: "Card",
+        props: { title: "Daily views", description: "Rolling 14-day window" },
+        style: { span: 12 },
+        children: [
+          {
+            id: "trend-chart",
+            type: "Chart",
+            props: {
+              kind: "area",
+              title: "Daily views",
+              subtitle: "+22% this month",
+              data: Array.from({ length: 14 }, (_, i) => ({
+                label: `Dec ${i + 13}`,
+                value: Math.round(60_000 + Math.sin(i / 2) * 18_000 + i * 2_400),
+              })),
+            },
+          },
+        ],
+      },
       {
         id: "views",
         type: "Stat",
         props: {
           label: "Views",
-          value: 1284200,
+          value: "1.28M",
           delta: "+22% this month",
           trend: "up",
           sparkline: [820, 910, 980, 1050, 1140, 1220, 1284],
@@ -250,23 +343,42 @@ export const contentSeed: Dashboard = {
         props: {
           label: "Avg. watch time",
           value: "3m 18s",
-          delta: "+22s",
+          delta: "+22 sec",
           trend: "up",
         },
         style: { span: 4 },
       },
       {
-        id: "trend",
-        type: "Chart",
+        id: "top-posts",
+        type: "Card",
+        props: { title: "Top posts", description: "By views this week" },
+        style: { span: 8 },
+        children: [
+          {
+            id: "posts-table",
+            type: "Table",
+            props: {
+              columns: ["Title", "Views", "CTR", "Watch time"],
+              rows: [
+                ["How we rebuilt search", "148,200", "6.1%", "4m 12s"],
+                ["Why we left Figma", "92,400", "5.4%", "3m 47s"],
+                ["The future of design tokens", "71,800", "4.2%", "3m 02s"],
+                ["State machines, simply", "54,100", "3.8%", "2m 58s"],
+              ],
+            },
+          },
+        ],
+      },
+      {
+        id: "virality-callout",
+        type: "Callout",
         props: {
-          kind: "area",
-          title: "Daily views",
-          data: Array.from({ length: 14 }, (_, i) => ({
-            label: `D${i + 1}`,
-            value: Math.round(60_000 + Math.sin(i / 2) * 18_000 + i * 2_400),
-          })),
+          intent: "info",
+          title: "One post is driving 22% of views",
+          message:
+            '"How we rebuilt search" went viral on Hacker News on Dec 19. Views are stabilizing — 3-day rolling average is normalizing.',
         },
-        style: { span: 12 },
+        style: { span: 4 },
       },
     ],
   },

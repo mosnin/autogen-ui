@@ -6,18 +6,27 @@ import { Modal, Tooltip } from "./components/overlays";
 import {
   Badge,
   Button,
+  Callout,
   Card,
   Chart,
   Divider,
+  EmptyState,
   Grid,
   Heading,
   List,
+  Metric,
   Progress,
+  RingProgress,
   Section,
+  Sparkline,
   Stack,
   Stat,
+  Stepper,
   Table,
+  Tag,
+  TagGroup,
   Text,
+  Timeline,
 } from "./components/primitives";
 import type { ComponentRegistry } from "./components/types";
 
@@ -66,10 +75,25 @@ export const componentCatalog: ComponentDoc[] = [
     acceptsChildren: false,
   },
   {
+    type: "Metric",
+    description:
+      "Hero number — one metric that dominates the section. Larger than Stat, centered, no border. Use for the single most important number on a page.",
+    props:
+      "label?: string, value: string|number, prefix?: string (e.g. '$'), suffix?: string (e.g. '%'), description?: string (shows below with trend color), trend?: 'up'|'down'|'flat', span?: 1-12 (default 6)",
+    acceptsChildren: false,
+  },
+  {
+    type: "Sparkline",
+    description:
+      "Inline mini trend line from a number array. Area-filled, trend-colored (green if rising, red if falling). Use inside cards, next to labels, or as standalone context.",
+    props: "data: number[], size?: 'sm'|'md'|'lg' (default 'md'), trend?: boolean (color by direction, default true), color?: string (CSS color override)",
+    acceptsChildren: false,
+  },
+  {
     type: "Chart",
     description: "Dependency-free SVG chart. Animates on mount and on data change.",
     props:
-      "kind: 'bar'|'line'|'area', data: {label:string,value:number}[], title?: string, span?: 1-12 (default 6)",
+      "kind: 'bar'|'line'|'area'|'pie'|'donut', data: {label:string,value:number,...}[], title?: string, subtitle?: string, series?: string[] (multi-series: keys to pluck from each data row; ignored for pie/donut), span?: 1-12 (default 6)",
     acceptsChildren: false,
   },
   {
@@ -108,6 +132,13 @@ export const componentCatalog: ComponentDoc[] = [
     type: "Progress",
     description: "Horizontal progress bar.",
     props: "label?: string, value: number (0-100)",
+    acceptsChildren: false,
+  },
+  {
+    type: "RingProgress",
+    description:
+      "Circular ring with animated fill and centered percentage. Use for completion rates, scores, and single-dimension progress.",
+    props: "value: number (0-100), label?: string, size?: 'sm'|'md'|'lg' (default 'md'), color?: string (CSS color, defaults to primary)",
     acceptsChildren: false,
   },
   {
@@ -272,6 +303,42 @@ export const componentCatalog: ComponentDoc[] = [
     props: "keys: string",
     acceptsChildren: false,
   },
+  {
+    type: "Timeline",
+    description: "Vertical timeline with status-coded steps (done/current/pending). items prop is an array of {id, title, description?, timestamp?, status}.",
+    props: "items: Array<{id, title, description?, timestamp?, status: 'done'|'current'|'pending'}>",
+    acceptsChildren: false,
+  },
+  {
+    type: "Callout",
+    description: "Alert/callout box with colored left border. Use for info, warnings, errors, and success messages.",
+    props: "variant: 'info'|'warning'|'success'|'error', title?: string, content?: string",
+    acceptsChildren: true,
+  },
+  {
+    type: "Stepper",
+    description: "Horizontal step progress indicator with connecting track. Steps can be done/active/pending.",
+    props: "steps: string[], current: number (0-indexed active step)",
+    acceptsChildren: false,
+  },
+  {
+    type: "Tag",
+    description: "Single chip-style label. More expressive than Badge — use for filterable tags, categories, or multi-value selections.",
+    props: "label: string, variant?: 'default'|'blue'|'green'|'amber'|'red'|'purple', removable?: boolean",
+    acceptsChildren: false,
+  },
+  {
+    type: "TagGroup",
+    description: "Renders an array of tags as a wrapping chip row. Each item can be a string or {label, variant?}.",
+    props: "tags: (string | {label: string, variant?: string})[], variant?: 'default'|'blue'|'green'|'amber'|'red'|'purple'",
+    acceptsChildren: false,
+  },
+  {
+    type: "EmptyState",
+    description: "Illustrated empty state for dashboards. Use when a section has no data yet, or as a placeholder for future content. Optionally shows a call-to-action button.",
+    props: "title?: string, description?: string, icon?: 'inbox'|'search'|'chart'|'file'|'users'|'default', action?: string (button label)",
+    acceptsChildren: false,
+  },
 ];
 
 /** Built-in component registry mapping spec `type` -> React component. */
@@ -281,6 +348,8 @@ export const defaultRegistry: ComponentRegistry = {
   Section,
   Card,
   Stat,
+  Metric,
+  Sparkline,
   Chart,
   Table,
   Heading,
@@ -288,6 +357,7 @@ export const defaultRegistry: ComponentRegistry = {
   Badge,
   Button,
   Progress,
+  RingProgress,
   List,
   Divider,
   Box,
@@ -314,6 +384,12 @@ export const defaultRegistry: ComponentRegistry = {
   CodeBlock,
   Quote,
   Kbd,
+  Timeline,
+  Callout,
+  Stepper,
+  Tag,
+  TagGroup,
+  EmptyState,
 };
 
 /** Merge custom components onto the defaults. Custom entries win on conflict. */

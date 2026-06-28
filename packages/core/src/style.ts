@@ -244,6 +244,109 @@ const ITALIC = "italic";
 const TRUNCATE = "truncate";
 const GROW = "grow";
 
+const BLUR: Record<string, string> = {
+  none: "backdrop-blur-none",
+  sm: "backdrop-blur-sm",
+  md: "backdrop-blur-md",
+  lg: "backdrop-blur-lg",
+  xl: "backdrop-blur-xl",
+  "2xl": "backdrop-blur-2xl",
+};
+
+const GRADIENT: Record<string, string> = {
+  "to-r": "bg-gradient-to-r",
+  "to-b": "bg-gradient-to-b",
+  "to-br": "bg-gradient-to-br",
+  "to-t": "bg-gradient-to-t",
+  "to-tr": "bg-gradient-to-tr",
+  "to-bl": "bg-gradient-to-bl",
+};
+
+const GRADIENT_FROM: Record<string, string> = {
+  background: "from-background",
+  foreground: "from-foreground",
+  card: "from-card",
+  "card-foreground": "from-card-foreground",
+  primary: "from-primary",
+  "primary-foreground": "from-primary-foreground",
+  secondary: "from-secondary",
+  "secondary-foreground": "from-secondary-foreground",
+  muted: "from-muted",
+  "muted-foreground": "from-muted-foreground",
+  accent: "from-accent",
+  "accent-foreground": "from-accent-foreground",
+  border: "from-border",
+  transparent: "from-transparent",
+};
+
+const GRADIENT_TO: Record<string, string> = {
+  background: "to-background",
+  foreground: "to-foreground",
+  card: "to-card",
+  "card-foreground": "to-card-foreground",
+  primary: "to-primary",
+  "primary-foreground": "to-primary-foreground",
+  secondary: "to-secondary",
+  "secondary-foreground": "to-secondary-foreground",
+  muted: "to-muted",
+  "muted-foreground": "to-muted-foreground",
+  accent: "to-accent",
+  "accent-foreground": "to-accent-foreground",
+  border: "to-border",
+  transparent: "to-transparent",
+};
+
+const RING: Record<string, string> = {
+  none: "ring-0",
+  "1": "ring-1",
+  "2": "ring-2",
+  "4": "ring-4",
+};
+
+const RING_COLOR: Record<string, string> = {
+  background: "ring-background",
+  foreground: "ring-foreground",
+  card: "ring-card",
+  "card-foreground": "ring-card-foreground",
+  primary: "ring-primary",
+  "primary-foreground": "ring-primary-foreground",
+  secondary: "ring-secondary",
+  "secondary-foreground": "ring-secondary-foreground",
+  muted: "ring-muted",
+  "muted-foreground": "ring-muted-foreground",
+  accent: "ring-accent",
+  "accent-foreground": "ring-accent-foreground",
+  border: "ring-border",
+  transparent: "ring-transparent",
+};
+
+const LETTER_SPACING: Record<string, string> = {
+  tighter: "tracking-tighter",
+  tight: "tracking-tight",
+  normal: "tracking-normal",
+  wide: "tracking-wide",
+  wider: "tracking-wider",
+  widest: "tracking-widest",
+};
+
+const LINE_HEIGHT: Record<string, string> = {
+  none: "leading-none",
+  tight: "leading-tight",
+  snug: "leading-snug",
+  normal: "leading-normal",
+  relaxed: "leading-relaxed",
+  loose: "leading-loose",
+};
+
+const TEXT_TRANSFORM: Record<string, string> = {
+  uppercase: "uppercase",
+  lowercase: "lowercase",
+  capitalize: "capitalize",
+  "normal-case": "normal-case",
+};
+
+const GLASS = "glass";
+
 /* ------------------------------------------------------------------ *
  * Prefixed-map generation. Tailwind needs to see literal prefixed
  * strings, so every base class is also emitted with each prefix into
@@ -296,6 +399,16 @@ const ALL_BASE_CLASSES: string[] = [
   ITALIC,
   TRUNCATE,
   GROW,
+  ...allValues(BLUR),
+  ...allValues(GRADIENT),
+  ...allValues(GRADIENT_FROM),
+  ...allValues(GRADIENT_TO),
+  ...allValues(RING),
+  ...allValues(RING_COLOR),
+  ...allValues(LETTER_SPACING),
+  ...allValues(LINE_HEIGHT),
+  ...allValues(TEXT_TRANSFORM),
+  GLASS,
 ];
 
 /**
@@ -350,6 +463,16 @@ function coreToClasses(core: StyleCore, prefix: Prefix): string[] {
   if (core.textAlign !== undefined) out.push(withPrefix(prefix, TEXT_ALIGN[core.textAlign]));
   if (core.italic) out.push(withPrefix(prefix, ITALIC));
   if (core.truncate) out.push(withPrefix(prefix, TRUNCATE));
+  if (core.blur !== undefined) out.push(withPrefix(prefix, BLUR[core.blur]));
+  if (core.glass) out.push(withPrefix(prefix, GLASS));
+  if (core.gradient !== undefined) out.push(withPrefix(prefix, GRADIENT[core.gradient]));
+  if (core.gradientFrom !== undefined) out.push(withPrefix(prefix, GRADIENT_FROM[core.gradientFrom]));
+  if (core.gradientTo !== undefined) out.push(withPrefix(prefix, GRADIENT_TO[core.gradientTo]));
+  if (core.ring !== undefined) out.push(withPrefix(prefix, RING[core.ring]));
+  if (core.ringColor !== undefined) out.push(withPrefix(prefix, RING_COLOR[core.ringColor]));
+  if (core.letterSpacing !== undefined) out.push(withPrefix(prefix, LETTER_SPACING[core.letterSpacing]));
+  if (core.lineHeight !== undefined) out.push(withPrefix(prefix, LINE_HEIGHT[core.lineHeight]));
+  if (core.textTransform !== undefined) out.push(withPrefix(prefix, TEXT_TRANSFORM[core.textTransform]));
 
   return out.filter((c): c is string => Boolean(c));
 }

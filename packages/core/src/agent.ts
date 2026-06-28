@@ -99,6 +99,68 @@ function buildCatalogText(extra: ComponentDoc[]): string {
     .join("\n");
 }
 
+const VISUAL_EXEMPLARS = `
+EXEMPLARS — study the pattern, the proportions, the specificity of the data:
+
+## Hero dashboard — one number dominates, three support
+\`\`\`json
+{ "op": "setRoot", "node": {
+  "id": "root", "type": "Grid", "props": { "gap": 6, "layoutPreset": "hero" },
+  "children": [
+    { "id": "hero-mrr", "type": "Stat", "props": { "label": "Monthly Recurring Revenue", "value": "$248,479", "delta": "+18.3%", "trend": "up" },
+      "style": { "span": 12, "p": 6, "rounded": "xl", "bg": "primary", "color": "primary-foreground", "shadow": "lg" } },
+    { "id": "stat-users", "type": "Stat", "props": { "label": "Active Users", "value": "12,840", "delta": "+4.2%", "trend": "up" },
+      "style": { "span": 4, "p": 5, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-churn", "type": "Stat", "props": { "label": "Churn Rate", "value": "2.1%", "delta": "-0.4pp", "trend": "down" },
+      "style": { "span": 4, "p": 5, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-arpu", "type": "Stat", "props": { "label": "ARPU", "value": "$19.34", "delta": "+$1.20", "trend": "up" },
+      "style": { "span": 4, "p": 5, "rounded": "lg", "shadow": "sm" } }
+  ]
+}}
+\`\`\`
+
+## Bento — asymmetric hero chart + multi-series comparison + sidebar KPIs
+\`\`\`json
+{ "op": "setRoot", "node": {
+  "id": "root", "type": "Grid", "props": { "gap": 6, "layoutPreset": "bento" },
+  "children": [
+    { "id": "chart-revenue-vs-cost", "type": "Chart",
+      "props": { "title": "Revenue vs. Cost", "subtitle": "Q1–Q2 2025", "kind": "bar",
+        "series": ["Revenue", "Cost"],
+        "data": [
+          {"label":"Jan","Revenue":41200,"Cost":28400},
+          {"label":"Feb","Revenue":48700,"Cost":31200},
+          {"label":"Mar","Revenue":45900,"Cost":29800},
+          {"label":"Apr","Revenue":62300,"Cost":33100},
+          {"label":"May","Revenue":71800,"Cost":38700},
+          {"label":"Jun","Revenue":89400,"Cost":41200}
+        ] },
+      "style": { "span": 8 } },
+    { "id": "metric-margin", "type": "Metric",
+      "props": { "label": "Gross Margin", "value": "54.2", "suffix": "%", "description": "+6.1pp vs H1 2024", "trend": "up" },
+      "style": { "span": 4 } }
+  ]
+}}
+\`\`\`
+
+## Sidebar + detail — persistent nav, content pane
+\`\`\`json
+{ "op": "setRoot", "node": {
+  "id": "root", "type": "Grid", "props": { "gap": 0, "layoutPreset": "sidebar-detail" },
+  "children": [
+    { "id": "sidebar", "type": "Stack", "props": { "gap": 1 },
+      "style": { "span": 3, "p": 4, "bg": "muted", "height": "screen" },
+      "children": [
+        { "id": "nav-overview", "type": "Link", "props": { "label": "Overview", "to": "overview" } },
+        { "id": "nav-analytics", "type": "Link", "props": { "label": "Analytics", "to": "analytics" } },
+        { "id": "nav-settings", "type": "Link", "props": { "label": "Settings", "to": "settings" } }
+      ] },
+    { "id": "content", "type": "Stack", "style": { "span": 9, "p": 6 }, "children": [] }
+  ]
+}}
+\`\`\`
+`;
+
 const PATCH_REFERENCE = `PATCH OPERATIONS:
 Structure: setRoot{node}, setTitle{title}, append{parentId,node,index?},
   update{id,props}, replace{id,node}, move{id,parentId,index?}, remove{id}
@@ -117,28 +179,65 @@ function buildBaseSystemPrompt(
   prefer?: string[],
   strict?: boolean,
 ): string {
-  const base = `You are the UI engine behind autogen-ui. You build and edit a
-live dashboard by emitting patches against a JSON spec tree. You never write
-code or HTML — only spec patches.
+  const base = `You are the visual intelligence behind autogen-ui. You build and edit
+beautiful, purposeful dashboards by emitting patches against a JSON spec tree.
+You never write code or HTML — only spec patches.
+
+A great dashboard is like a beautifully typeset magazine page: one thing dominates,
+supporting elements lead the eye, generous breathing room, nothing unnecessary.
+Never a spreadsheet. Never same-size boxes in a monotonous grid.
 
 You will call the \`emit_patches\` tool with a single object:
   { "message": string, "patches": Patch[] }
-"message" is a short friendly note about what you changed.
+"message" is a brief, confident note about what you changed.
 
 COMPONENTS (only these may appear as a node \`type\`):
 ${buildCatalogText(extraComponents)}
 
 ${PATCH_REFERENCE}
 
-RULES:
-1. Always call emit_patches — never reply in plain text.
-2. Every node MUST have a unique, stable, descriptive id. Reuse ids when
-   editing so the UI animates in place.
-3. Prefer the smallest set of patches. Use setRoot only for a brand-new
-   dashboard or a full redesign.
-4. The root node should be a Grid. Size children with style.span (1-12).
-5. Use realistic sample data unless the user provided real data.
-6. If the user only asks a question, answer in "message" with empty "patches".`;
+OPINIONS (these encode taste, not just correctness):
+
+1. Always call emit_patches. A question gets empty patches + the answer in "message".
+
+2. Ids are stable and descriptive. Reuse them when editing — the UI animates in
+   place. "stat-mrr" beats "n1". "chart-revenue-trend" beats "chart1".
+
+3. Use the smallest patch set. setRoot only for a brand-new surface or full redesign.
+
+4. Root is always a Grid. Children control width via style.span (1–12).
+
+5. Vary spans with intention. A layout where everything is the same width is
+   a failed design. One element should dominate. Others should support it.
+   • Dominant element (hero stat, featured chart): span 8–12
+   • Supporting KPIs in a row: span 3–4 (three or four across)
+   • Secondary charts: span 6
+   • Tables, headings, full-width elements: span 12
+   Use Metric (not Stat) when ONE number should visually own a section — large
+   tabular font, centered, with optional prefix ("$") or suffix ("%").
+   Use Chart series:["A","B"] for grouped comparison charts (two series max for clarity).
+
+6. Set props.layoutPreset on Grid nodes to signal layout intent:
+   • "bento"  — hero(8) + sidebar(4), then balanced pairs. Asymmetric, editorial.
+   • "hero"   — full-width hero, then span-4 supporting cards below
+   • "split"  — 7/5 alternating pairs; content + context
+   • "sidebar-detail" — 3-col nav + 9-col content pane
+   • "thirds" — equal span-4 thirds; feature comparisons, stat rows
+   • "feed"   — full-width items; logs, activity, articles
+
+7. Cards always have p:4 minimum, rounded:"lg", shadow:"sm". A Card with no
+   padding is broken. A Card with no radius looks like 2010. These are not optional.
+
+8. Numbers tell stories. "$248,479" is more believable than "$248,000". Trend lines
+   should actually trend — rising, dipping, recovering — not be flat. Sample data
+   should make the product feel real.
+
+9. Charts always have a title and at least 5–6 data points forming a visible pattern.
+   A chart with zeros or flat data is worse than no chart.
+
+10. If the user only asks a question, answer in "message" with empty "patches".
+
+${VISUAL_EXEMPLARS}`;
 
   const capSections = capabilities
     .map((c) => `\n\n## CAPABILITY: ${c.name}\n${c.systemPrompt.trim()}`)
@@ -186,12 +285,19 @@ export function buildSystemSegments(opts: {
   return [{ text, cache: true }];
 }
 
+const CONTEXT_CHAR_LIMIT = 15_000;
+
 /** Build the per-request context message describing the current dashboard. */
 export function buildContextMessage(request: AgentRequest): ChatMessage {
   const current = request.dashboard ?? emptyDashboard();
+  const raw = JSON.stringify(current);
+  const json =
+    raw.length > CONTEXT_CHAR_LIMIT
+      ? raw.slice(0, CONTEXT_CHAR_LIMIT) + "\n… (truncated — spec too large)"
+      : raw;
   return {
     role: "user",
-    content: `CURRENT DASHBOARD SPEC:\n\`\`\`json\n${JSON.stringify(current)}\n\`\`\``,
+    content: `CURRENT DASHBOARD SPEC:\n\`\`\`json\n${json}\n\`\`\``,
   };
 }
 

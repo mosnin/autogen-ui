@@ -113,15 +113,20 @@ export {
   brandPresets,
   forestKit,
   linearKit,
+  midnightKit,
   monoKit,
+  neonKit,
+  oceanKit,
+  roseKit,
   sharpKit,
+  solarKit,
   violetKit,
   warmKit,
   type BrandPresetName,
 } from "./brand-presets";
 export { voicePresets, type VoicePresetName } from "./voice-presets";
 
-// Phase 3 — runtime component definition
+// Runtime component definition
 export { instantiateComponent, listComponentTypes, validateComponentDef } from "./define";
 export {
   createCodegenResolver,
@@ -129,7 +134,7 @@ export {
   type CodegenResolver,
 } from "./sandbox/codegen";
 
-// Phase 4 — dynamic data + declarative actions
+// Dynamic data + declarative actions
 export {
   builtinFilters,
   evaluateBinding,
@@ -157,7 +162,7 @@ export {
   type UseRuntimeResult,
 } from "./hooks/useRuntime";
 
-// Phase 2 — real-time streaming
+// Real-time streaming
 export { encodeFrame, framesToResponse, readFrames } from "./stream";
 export {
   createStreamingUIAgent,
@@ -211,6 +216,11 @@ export {
   type UIAgent,
 } from "./agent";
 export { systemToSegments, systemToString } from "./llm";
+export {
+  createAgentFactory,
+  type AgentBuildOptions,
+  type AgentFactoryOptions,
+} from "./agent-factory";
 
 // React hooks (client)
 export {
@@ -220,7 +230,7 @@ export {
 } from "./hooks/useDashboard";
 export { useAutoSave, type UseAutoSaveOptions } from "./hooks/useAutoSave";
 
-// Phase 5 — history, persistence, eval
+// History, persistence, eval
 export {
   createHistory,
   useHistory,
