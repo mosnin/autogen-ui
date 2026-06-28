@@ -188,6 +188,115 @@ const SHOWCASES: { title: string; description: string; dashboard: Dashboard }[] 
       },
     ]),
   },
+  {
+    title: "Metric · RingProgress · Sparkline",
+    description: "Data density: hero numbers, circular progress, and inline mini trends.",
+    dashboard: makeShowcase([
+      {
+        id: "metric-mrr",
+        type: "Metric",
+        props: {
+          label: "Monthly Recurring Revenue",
+          value: "$248,479",
+          description: "+18.3% vs last month",
+          trend: "up",
+        },
+        style: { span: 6 },
+      },
+      {
+        id: "ring-nps",
+        type: "RingProgress",
+        props: { value: 72, label: "NPS Score", size: "lg" },
+        style: { span: 3 },
+      },
+      {
+        id: "ring-util",
+        type: "RingProgress",
+        props: { value: 88, label: "Utilization", size: "lg" },
+        style: { span: 3 },
+      },
+      {
+        id: "spark-card",
+        type: "Card",
+        props: { title: "Inline trend lines" },
+        style: { span: 12 },
+        children: [
+          { id: "sp1", type: "Sparkline", props: { data: [40, 55, 48, 62, 58, 71, 80], size: "lg" } },
+          { id: "sp2", type: "Sparkline", props: { data: [80, 71, 58, 62, 48, 55, 40], size: "lg" } },
+        ],
+      },
+    ]),
+  },
+  {
+    title: "Timeline · Callout · Stepper",
+    description: "Activity feeds, insight callouts, and multi-step progress indicators.",
+    dashboard: makeShowcase([
+      {
+        id: "timeline",
+        type: "Timeline",
+        props: {
+          items: [
+            { id: "t1", title: "Enterprise upgrade", description: "Acme Corp → $2,400/mo", timestamp: "2h ago", status: "done" },
+            { id: "t2", title: "Churn alert", description: "3 accounts at risk", timestamp: "5h ago", status: "current" },
+            { id: "t3", title: "Billing closed", description: "$1.24M collected", timestamp: "Yesterday", status: "done" },
+            { id: "t4", title: "Q3 review scheduled", description: "Board deck in progress", timestamp: "3 days ago", status: "done" },
+          ],
+        },
+        style: { span: 6 },
+      },
+      {
+        id: "callouts",
+        type: "Stack",
+        props: { direction: "col", gap: 3 },
+        style: { span: 6 },
+        children: [
+          { id: "ca1", type: "Callout", props: { variant: "success", title: "All systems operational", content: "P99 latency under 80ms." } },
+          { id: "ca2", type: "Callout", props: { variant: "warning", title: "Recovery score low", content: "HRV 14% below baseline." } },
+          { id: "ca3", type: "Callout", props: { variant: "info", title: "New feature available", content: "Multi-series charts now support hover tooltips." } },
+        ],
+      },
+      {
+        id: "stepper",
+        type: "Card",
+        props: { title: "Onboarding" },
+        style: { span: 12 },
+        children: [
+          { id: "stp", type: "Stepper", props: { steps: ["Connect data", "Configure layout", "Publish", "Monitor"], current: 2 } },
+        ],
+      },
+    ]),
+  },
+  {
+    title: "TagGroup · EmptyState",
+    description: "Category filters and empty state placeholders.",
+    dashboard: makeShowcase([
+      {
+        id: "tg",
+        type: "TagGroup",
+        props: {
+          tags: [
+            { label: "Electronics", variant: "blue" },
+            { label: "Apparel", variant: "purple" },
+            { label: "Home & Garden", variant: "green" },
+            { label: "Sports", variant: "amber" },
+            { label: "Beauty", variant: "red" },
+          ],
+        },
+        style: { span: 12 },
+      },
+      {
+        id: "empty",
+        type: "EmptyState",
+        props: {
+          title: "No products found",
+          description: "Try clearing your filters or searching with different keywords.",
+          icon: "search",
+          action: "Clear filters",
+        },
+        style: { span: 12 },
+      },
+    ]),
+  },
 ];
 
 function makeShowcase(children: Dashboard["root"]["children"]): Dashboard {
