@@ -120,15 +120,18 @@ export const builtinPropSchemas: ComponentPropSchemas = {
       value: stringOrNumber,
       delta: z.string().optional(),
       trend: z.enum(["up", "down", "flat"]).optional(),
+      sparkline: z.array(z.number()).optional(),
       span: spanToken.optional(),
     })
     .passthrough(),
 
   Chart: z
     .object({
-      kind: z.enum(["bar", "line", "area"]),
+      kind: z.enum(["bar", "line", "area", "pie", "donut"]),
       data: z.array(chartDatumSchema),
       title: z.string().optional(),
+      subtitle: z.string().optional(),
+      series: z.array(z.string()).optional(),
       span: spanToken.optional(),
     })
     .passthrough(),
@@ -302,9 +305,10 @@ export const builtinPropSchemas: ComponentPropSchemas = {
 
   Link: z
     .object({
-      href: z.string(),
+      href: z.string().optional(),
       text: z.string(),
       newTab: z.boolean().optional(),
+      to: z.string().optional(),
     })
     .passthrough(),
 

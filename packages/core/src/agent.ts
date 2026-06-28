@@ -279,8 +279,10 @@ OPINIONS (these encode taste, not just correctness):
 
 11. Use EmptyState when a section has no data yet. Use TagGroup for category filters,
     labels, and multi-value selections — it shows range. Use Timeline for activity
-    feeds, audit logs, and step-by-step processes. Use Callout to highlight one
-    important insight per section (info/success/warning/error).
+    feeds, audit logs, and step-by-step processes. Use Stepper for onboarding flows,
+    setup checklists, and any numbered multi-step sequence — always set `current`
+    to the active step index. Use Callout to highlight one important insight per
+    section (info/success/warning/error).
 
 12. If the user only asks a question, answer in "message" with empty "patches".
 

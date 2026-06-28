@@ -249,8 +249,8 @@ export const componentCatalog: ComponentDoc[] = [
   },
   {
     type: "Link",
-    description: "Anchor link. Opens in a new tab when `newTab` is true.",
-    props: "href: string, text: string, newTab?: boolean",
+    description: "Anchor link or in-app navigation. Use `href` for external URLs, `to` for navigating to a named screen (sets state.currentScreen).",
+    props: "href?: string, text: string, newTab?: boolean, to?: string (screen name for in-app navigation)",
     acceptsChildren: false,
   },
   {

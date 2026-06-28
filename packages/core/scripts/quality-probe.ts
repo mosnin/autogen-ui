@@ -84,6 +84,24 @@ const SCENARIOS: Scenario[] = [
       "Build a contact form with a name field, an email field that validates as an email, a message textarea, a subscribe switch, and a submit button. Wire it to state.",
     ],
   },
+  {
+    name: "data-density (Metric + RingProgress + Sparkline + Callout)",
+    turns: [
+      "Build an executive health dashboard: one dominant hero Metric for MRR, three KPI Stats with sparklines, two RingProgress rings for NPS and utilization, and a Callout highlighting the most important insight.",
+    ],
+  },
+  {
+    name: "catalog-filter (TagGroup + Table + EmptyState)",
+    turns: [
+      "Build a product catalog with a TagGroup for category filters, a Table of products, and an EmptyState that shows when no category is selected. Use realistic product data.",
+    ],
+  },
+  {
+    name: "activity-flow (Timeline + Stepper + bento layout)",
+    turns: [
+      "Build an onboarding dashboard with a Stepper showing progress through 4 steps, a Timeline of recent account events, and a bento-layout hero card with a welcome Metric.",
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------ *
