@@ -1089,7 +1089,7 @@ function MultiSeriesChartBody({
     const barW = (groupW * 0.72) / n;
     const groupPad = groupW * 0.14;
     return (
-      <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
+      <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto cursor-crosshair" role="img" aria-label={ariaLabel}>
         <title>{ariaLabel}</title>
         <g aria-hidden>
           {grid.map((y, i) => (
@@ -1132,7 +1132,7 @@ function MultiSeriesChartBody({
 
   const step = labels.length > 1 ? innerW / (labels.length - 1) : 0;
   return (
-    <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto" role="img" aria-label={ariaLabel}>
+    <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto cursor-crosshair" role="img" aria-label={ariaLabel}>
       <title>{ariaLabel}</title>
       <defs>
         {series.map((s, si) => (
