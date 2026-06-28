@@ -259,13 +259,14 @@ export default function Page() {
     setCanUndo(undoStack.current.length > 0);
   };
 
-  const useSeed = (prompt: string, seedId: string) => {
+  const useSeed = async (prompt: string, seedId: string) => {
     const seed = seeds.find((s) => s.id === seedId);
     if (seed) {
       undoStack.current = [...undoStack.current.slice(-7), dashboard];
       setDashboard(seed.dashboard);
     }
-    void sendMessage(`${prompt}. The current layout is a starting point — make it excellent.`);
+    await sendMessage(`${prompt}. The current layout is a starting point — make it excellent.`);
+    setCanUndo(undoStack.current.length > 0);
   };
 
   const share = async () => {
@@ -558,7 +559,7 @@ export default function Page() {
               </button>
             </div>
             <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground/40">
-              <span>↵ send · ⌘K focus · Esc clear</span>
+              <span>↵ send · ⌘K focus · Esc clear · ? help</span>
               {canUndo && !isLoading && (
                 <span>⌘Z undo</span>
               )}
