@@ -1084,13 +1084,148 @@ function MultiSeriesChartBody({
   const innerH = H - PAD * 2;
   const grid = [0.33, 0.66, 1].map((f) => PAD + innerH - innerH * f);
 
+  const [hovered, setHovered] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const onMove = (evt: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const x = ((evt.clientX - rect.left) / rect.width) * (W + 40) - 40;
+    const step =
+      kind === "bar"
+        ? innerW / labels.length
+        : innerW / Math.max(labels.length - 1, 1);
+    if (step <= 0) return;
+    const i =
+      kind === "bar"
+        ? Math.floor((x - PAD) / step)
+        : Math.round((x - PAD) / step);
+    if (i >= 0 && i < labels.length) setHovered(i);
+  };
+
+  const tooltip = (() => {
+    if (hovered === null) return null;
+    const label = labels[hovered];
+    if (label === undefined) return null;
+    const isBar = kind === "bar";
+    const step = isBar ? innerW / labels.length : innerW / Math.max(labels.length - 1, 1);
+    const cx = isBar ? PAD + step * hovered + step / 2 : PAD + step * hovered;
+    const xPct = ((cx + 40) / (W + 40)) * 100;
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none absolute -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-border bg-card px-2 py-1.5 text-[11px] shadow-rest z-10"
+        style={{ left: `${xPct}%`, top: `${(PAD / (H + 20)) * 100}%` }}
+      >
+        <div className="font-medium mb-1">{label}</div>
+        {series.map((s, si) => (
+          <div key={si} className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+            <span className="text-muted-foreground">{s.name}</span>
+            <span className="ml-auto pl-3 font-tabular font-medium">
+              {(s.points[hovered]?.value ?? 0).toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  })();
+
   if (kind === "bar") {
     const groupW = innerW / labels.length;
     const barW = (groupW * 0.72) / n;
     const groupPad = groupW * 0.14;
     return (
-      <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto cursor-crosshair" role="img" aria-label={ariaLabel}>
+      <div className="relative">
+        {tooltip}
+        <svg
+          ref={svgRef}
+          viewBox={`-40 0 ${W + 40} ${H + 20}`}
+          className="w-full h-auto cursor-crosshair"
+          role="img"
+          aria-label={ariaLabel}
+          onMouseMove={onMove}
+          onMouseLeave={() => setHovered(null)}
+        >
+          <title>{ariaLabel}</title>
+          <g aria-hidden>
+            {grid.map((y, i) => (
+              <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
+            ))}
+          </g>
+          {grid.map((y, i) => (
+            <text key={i} x={-4} y={y + 3} textAnchor="end" className="text-[9px] font-tabular fill-muted-foreground/60" fontSize="9">
+              {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
+            </text>
+          ))}
+          {labels.map((label, gi) => (
+            <g key={gi}>
+              {series.map((s, si) => {
+                const val = s.points[gi]?.value ?? 0;
+                const h = (val / max) * innerH;
+                const x = PAD + gi * groupW + groupPad + si * barW;
+                return (
+                  <motion.rect
+                    key={si}
+                    x={x}
+                    width={barW * 0.88}
+                    rx={2}
+                    fill={s.color}
+                    opacity={hovered === null || hovered === gi ? 0.9 : 0.4}
+                    initial={{ height: 0, y: PAD + innerH }}
+                    animate={{ height: h, y: PAD + innerH - h }}
+                    transition={{ duration: 0.5, ease: EASE_OUT, delay: gi * 0.04 + si * 0.02 }}
+                  />
+                );
+              })}
+              <text
+                x={PAD + gi * groupW + groupW / 2}
+                y={H + 14}
+                textAnchor="middle"
+                className={cn(
+                  "text-[10px] font-tabular",
+                  hovered === gi ? "fill-foreground" : "fill-muted-foreground",
+                )}
+              >
+                {label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    );
+  }
+
+  const step = labels.length > 1 ? innerW / (labels.length - 1) : 0;
+  const seriesCoords = series.map((s) =>
+    s.points.map((p, i) => ({
+      x: PAD + i * step,
+      y: PAD + innerH - (p.value / max) * innerH,
+    })),
+  );
+  return (
+    <div className="relative">
+      {tooltip}
+      <svg
+        ref={svgRef}
+        viewBox={`-40 0 ${W + 40} ${H + 20}`}
+        className="w-full h-auto cursor-crosshair"
+        role="img"
+        aria-label={ariaLabel}
+        onMouseMove={onMove}
+        onMouseLeave={() => setHovered(null)}
+      >
         <title>{ariaLabel}</title>
+        <defs>
+          {series.map((s, si) => (
+            <linearGradient key={si} id={`ms-area-${si}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
         <g aria-hidden>
           {grid.map((y, i) => (
             <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
@@ -1101,79 +1236,56 @@ function MultiSeriesChartBody({
             {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
           </text>
         ))}
-        {labels.map((label, gi) => (
-          <g key={gi}>
-            {series.map((s, si) => {
-              const val = s.points[gi]?.value ?? 0;
-              const h = (val / max) * innerH;
-              const x = PAD + gi * groupW + groupPad + si * barW;
-              return (
-                <motion.rect
-                  key={si}
-                  x={x}
-                  width={barW * 0.88}
-                  rx={2}
+        {hovered !== null && (
+          <line
+            x1={PAD + hovered * step}
+            x2={PAD + hovered * step}
+            y1={PAD}
+            y2={PAD + innerH}
+            className="stroke-foreground/30"
+            strokeWidth={1}
+            strokeDasharray="2 3"
+          />
+        )}
+        {series.map((s, si) => {
+          const coords = seriesCoords[si]!;
+          const line = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
+          const area = `${line} L${PAD + innerW},${PAD + innerH} L${PAD},${PAD + innerH} Z`;
+          return (
+            <g key={si}>
+              {kind === "area" && (
+                <motion.path d={area} fill={`url(#ms-area-${si})`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
+              )}
+              <motion.path d={line} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: EASE_OUT, delay: si * 0.1 }} />
+              {hovered !== null && coords[hovered] && (
+                <circle
+                  cx={coords[hovered]!.x}
+                  cy={coords[hovered]!.y}
+                  r={4}
                   fill={s.color}
-                  opacity={0.9}
-                  initial={{ height: 0, y: PAD + innerH }}
-                  animate={{ height: h, y: PAD + innerH - h }}
-                  transition={{ duration: 0.5, ease: EASE_OUT, delay: gi * 0.04 + si * 0.02 }}
+                  stroke="hsl(var(--card))"
+                  strokeWidth={1.5}
                 />
-              );
-            })}
-            <text x={PAD + gi * groupW + groupW / 2} y={H + 14} textAnchor="middle" className="text-[10px] font-tabular fill-muted-foreground">
-              {label}
-            </text>
-          </g>
+              )}
+            </g>
+          );
+        })}
+        {labels.map((label, i) => (
+          <text
+            key={i}
+            x={PAD + i * step}
+            y={H + 14}
+            textAnchor="middle"
+            className={cn(
+              "text-[10px] font-tabular",
+              hovered === i ? "fill-foreground" : "fill-muted-foreground",
+            )}
+          >
+            {label}
+          </text>
         ))}
       </svg>
-    );
-  }
-
-  const step = labels.length > 1 ? innerW / (labels.length - 1) : 0;
-  return (
-    <svg viewBox={`-40 0 ${W + 40} ${H + 20}`} className="w-full h-auto cursor-crosshair" role="img" aria-label={ariaLabel}>
-      <title>{ariaLabel}</title>
-      <defs>
-        {series.map((s, si) => (
-          <linearGradient key={si} id={`ms-area-${si}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={s.color} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={s.color} stopOpacity="0" />
-          </linearGradient>
-        ))}
-      </defs>
-      <g aria-hidden>
-        {grid.map((y, i) => (
-          <line key={i} x1={PAD} x2={PAD + innerW} y1={y} y2={y} className="stroke-border" strokeWidth={1} strokeDasharray="2 4" />
-        ))}
-      </g>
-      {grid.map((y, i) => (
-        <text key={i} x={-4} y={y + 3} textAnchor="end" className="text-[9px] font-tabular fill-muted-foreground/60" fontSize="9">
-          {formatAxisValue(max * [0.33, 0.66, 1][i]!)}
-        </text>
-      ))}
-      {series.map((s, si) => {
-        const coords = s.points.map((p, i) => ({
-          x: PAD + i * step,
-          y: PAD + innerH - (p.value / max) * innerH,
-        }));
-        const line = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
-        const area = `${line} L${PAD + innerW},${PAD + innerH} L${PAD},${PAD + innerH} Z`;
-        return (
-          <g key={si}>
-            {kind === "area" && (
-              <motion.path d={area} fill={`url(#ms-area-${si})`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
-            )}
-            <motion.path d={line} fill="none" stroke={s.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: EASE_OUT, delay: si * 0.1 }} />
-          </g>
-        );
-      })}
-      {labels.map((label, i) => (
-        <text key={i} x={PAD + i * step} y={H + 14} textAnchor="middle" className="text-[10px] font-tabular fill-muted-foreground">
-          {label}
-        </text>
-      ))}
-    </svg>
+    </div>
   );
 }
 

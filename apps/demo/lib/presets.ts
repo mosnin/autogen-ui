@@ -68,6 +68,7 @@ export const revenueSeed: Dashboard = {
               value: "$2.98M",
               delta: "+18% YoY",
               trend: "up",
+              sparkline: [1.8, 1.9, 2.1, 2.3, 2.5, 2.7, 2.98],
             },
           },
           {
@@ -334,6 +335,7 @@ export const contentSeed: Dashboard = {
           value: "4.2%",
           delta: "+0.3pp",
           trend: "up",
+          sparkline: [3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.2],
         },
         style: { span: 4 },
       },
@@ -345,6 +347,7 @@ export const contentSeed: Dashboard = {
           value: "3m 18s",
           delta: "+22 sec",
           trend: "up",
+          sparkline: [162, 170, 176, 180, 186, 192, 198],
         },
         style: { span: 4 },
       },
