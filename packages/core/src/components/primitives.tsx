@@ -1219,7 +1219,8 @@ function ChartBody({
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const x = ((evt.clientX - rect.left) / rect.width) * W;
+    // viewBox: -40 0 (W+40) (H+20) → map mouse pixel → SVG coordinate
+    const x = ((evt.clientX - rect.left) / rect.width) * (W + 40) - 40;
     const step = kind === "bar" ? innerW / points.length : innerW / Math.max(points.length - 1, 1);
     if (step <= 0) return;
     const i =
@@ -1236,7 +1237,8 @@ function ChartBody({
     const isBar = kind === "bar";
     const step = isBar ? innerW / points.length : innerW / Math.max(points.length - 1, 1);
     const cx = isBar ? PAD + step * hovered + step / 2 : PAD + step * hovered;
-    const xPct = (cx / W) * 100;
+    // viewBox starts at -40, total width is W+40; map SVG x into % of rendered element
+    const xPct = ((cx + 40) / (W + 40)) * 100;
     return (
       <div
         role="status"
