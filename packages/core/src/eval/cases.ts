@@ -241,8 +241,10 @@ export const goldenCases: EvalCase[] = [
       if (base) return base;
       if (result.patches.length === 0) return "expected patches";
       let hasCompact = false;
-      function walk(node: { type?: string; children?: typeof node[] }) {
+      function walk(node: { type?: string; props?: Record<string, unknown>; children?: typeof node[] }) {
         if (node.type === "RingProgress" || node.type === "Sparkline") hasCompact = true;
+        // Stat with sparkline prop also counts
+        if (node.type === "Stat" && Array.isArray(node.props?.sparkline)) hasCompact = true;
         for (const child of node.children ?? []) walk(child);
       }
       for (const p of result.patches) {
@@ -250,7 +252,53 @@ export const goldenCases: EvalCase[] = [
         if (p.op === "append") walk(p.node);
         if (p.op === "replace") walk(p.node);
       }
-      return hasCompact ? null : "expected RingProgress or Sparkline for compact visual data — these components add density without clutter";
+      return hasCompact ? null : "expected RingProgress, Sparkline, or Stat with sparkline prop — these add density without clutter";
+    },
+  },
+  {
+    name: "visual: Stat uses sparkline prop for mini trends",
+    messages: [
+      { role: "user", content: "Build a KPI dashboard with 4 key metrics. Each stat should show a mini trend line." },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      if (result.patches.length === 0) return "expected patches";
+      let statWithSparkline = false;
+      function walk(node: { type?: string; props?: Record<string, unknown>; children?: typeof node[] }) {
+        if (node.type === "Stat" && Array.isArray(node.props?.sparkline) && (node.props.sparkline as unknown[]).length >= 3) {
+          statWithSparkline = true;
+        }
+        for (const child of node.children ?? []) walk(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walk(p.node);
+        if (p.op === "append") walk(p.node);
+        if (p.op === "replace") walk(p.node);
+      }
+      return statWithSparkline ? null : "expected at least one Stat with a sparkline array prop for mini trend visualization";
+    },
+  },
+  {
+    name: "visual: Callout used for insight, not just a text block",
+    messages: [
+      { role: "user", content: "Build a marketing campaign dashboard. Surface the most important insight prominently." },
+    ],
+    expect: (result) => {
+      const base = assertValidPatches(result);
+      if (base) return base;
+      if (result.patches.length === 0) return "expected patches";
+      let calloutFound = false;
+      function walk(node: { type?: string; children?: typeof node[] }) {
+        if (node.type === "Callout") calloutFound = true;
+        for (const child of node.children ?? []) walk(child);
+      }
+      for (const p of result.patches) {
+        if (p.op === "setRoot") walk(p.node);
+        if (p.op === "append") walk(p.node);
+        if (p.op === "replace") walk(p.node);
+      }
+      return calloutFound ? null : "expected a Callout to surface the key insight — Callout is specifically for actionable, prominent messages";
     },
   },
 ];

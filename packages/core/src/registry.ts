@@ -69,9 +69,9 @@ export const componentCatalog: ComponentDoc[] = [
   },
   {
     type: "Stat",
-    description: "KPI tile: a label, a big value, and an optional delta with trend color.",
+    description: "KPI tile: a label, a big value, and an optional delta with trend color. Pass sparkline to show a mini trend line in the top-right corner.",
     props:
-      "label: string, value: string|number, delta?: string, trend?: 'up'|'down'|'flat', span?: 1-12 (default 3)",
+      "label: string, value: string|number, delta?: string, trend?: 'up'|'down'|'flat', sparkline?: number[] (mini trend, e.g. [180,195,210,232,241,248]), span?: 1-12 (default 3)",
     acceptsChildren: false,
   },
   {
