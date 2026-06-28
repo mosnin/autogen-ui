@@ -100,32 +100,36 @@ function buildCatalogText(extra: ComponentDoc[]): string {
 }
 
 const VISUAL_EXEMPLARS = `
-EXEMPLARS — study the pattern, the proportions, the specificity of the data:
+EXEMPLARS — study the proportions, the data specificity, the intentional hierarchy:
 
-## Hero dashboard — one number dominates, three support
+## Hero — one Metric dominates, three Stats support
 \`\`\`json
 { "op": "setRoot", "node": {
   "id": "root", "type": "Grid", "props": { "gap": 6, "layoutPreset": "hero" },
   "children": [
-    { "id": "hero-mrr", "type": "Stat", "props": { "label": "Monthly Recurring Revenue", "value": "$248,479", "delta": "+18.3%", "trend": "up" },
-      "style": { "span": 12, "p": 6, "rounded": "xl", "bg": "primary", "color": "primary-foreground", "shadow": "lg" } },
-    { "id": "stat-users", "type": "Stat", "props": { "label": "Active Users", "value": "12,840", "delta": "+4.2%", "trend": "up" },
-      "style": { "span": 4, "p": 5, "rounded": "lg", "shadow": "sm" } },
-    { "id": "stat-churn", "type": "Stat", "props": { "label": "Churn Rate", "value": "2.1%", "delta": "-0.4pp", "trend": "down" },
-      "style": { "span": 4, "p": 5, "rounded": "lg", "shadow": "sm" } },
-    { "id": "stat-arpu", "type": "Stat", "props": { "label": "ARPU", "value": "$19.34", "delta": "+$1.20", "trend": "up" },
-      "style": { "span": 4, "p": 5, "rounded": "lg", "shadow": "sm" } }
+    { "id": "hero-mrr", "type": "Metric",
+      "props": { "label": "Monthly Recurring Revenue", "value": "$248,479", "suffix": "", "description": "+18.3% vs Jan 2026", "trend": "up" },
+      "style": { "span": 12 } },
+    { "id": "stat-users", "type": "Stat",
+      "props": { "label": "Active Users", "value": "12,840", "delta": "+4.2%", "trend": "up" },
+      "style": { "span": 4, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-churn", "type": "Stat",
+      "props": { "label": "Churn Rate", "value": "2.1%", "delta": "-0.4pp", "trend": "down" },
+      "style": { "span": 4, "rounded": "lg", "shadow": "sm" } },
+    { "id": "stat-arpu", "type": "Stat",
+      "props": { "label": "ARPU", "value": "$19.34", "delta": "+$1.20", "trend": "up" },
+      "style": { "span": 4, "rounded": "lg", "shadow": "sm" } }
   ]
 }}
 \`\`\`
 
-## Bento — asymmetric hero chart + multi-series comparison + sidebar KPIs
+## Bento — asymmetric chart + KPI + timeline sidebar
 \`\`\`json
 { "op": "setRoot", "node": {
   "id": "root", "type": "Grid", "props": { "gap": 6, "layoutPreset": "bento" },
   "children": [
-    { "id": "chart-revenue-vs-cost", "type": "Chart",
-      "props": { "title": "Revenue vs. Cost", "subtitle": "Q1–Q2 2025", "kind": "bar",
+    { "id": "chart-revenue", "type": "Chart",
+      "props": { "title": "Revenue vs. Cost", "subtitle": "Jan–Jun 2026", "kind": "area",
         "series": ["Revenue", "Cost"],
         "data": [
           {"label":"Jan","Revenue":41200,"Cost":28400},
@@ -137,25 +141,51 @@ EXEMPLARS — study the pattern, the proportions, the specificity of the data:
         ] },
       "style": { "span": 8 } },
     { "id": "metric-margin", "type": "Metric",
-      "props": { "label": "Gross Margin", "value": "54.2", "suffix": "%", "description": "+6.1pp vs H1 2024", "trend": "up" },
+      "props": { "label": "Gross Margin", "value": "54.2", "suffix": "%", "description": "+6.1pp vs H1 2025", "trend": "up" },
+      "style": { "span": 4 } },
+    { "id": "activity", "type": "Timeline",
+      "props": { "items": [
+        { "id": "t1", "title": "Enterprise plan upgrade", "description": "Acme Corp → $2,400/mo", "timestamp": "2h ago", "status": "done" },
+        { "id": "t2", "title": "Churn alert: 3 accounts at risk", "description": "Usage dropped >40% in 14 days", "timestamp": "5h ago", "status": "current" },
+        { "id": "t3", "title": "Q2 billing cycle closed", "description": "$1.24M collected", "timestamp": "Yesterday", "status": "done" }
+      ] },
+      "style": { "span": 8 } },
+    { "id": "ring-nps", "type": "RingProgress",
+      "props": { "value": 72, "label": "NPS Score", "size": "lg" },
       "style": { "span": 4 } }
   ]
 }}
 \`\`\`
 
-## Sidebar + detail — persistent nav, content pane
+## Catalog + filter — TagGroup + EmptyState + real data
 \`\`\`json
 { "op": "setRoot", "node": {
-  "id": "root", "type": "Grid", "props": { "gap": 0, "layoutPreset": "sidebar-detail" },
+  "id": "root", "type": "Grid", "props": { "gap": 6 },
   "children": [
-    { "id": "sidebar", "type": "Stack", "props": { "gap": 1 },
-      "style": { "span": 3, "p": 4, "bg": "muted", "height": "screen" },
-      "children": [
-        { "id": "nav-overview", "type": "Link", "props": { "label": "Overview", "to": "overview" } },
-        { "id": "nav-analytics", "type": "Link", "props": { "label": "Analytics", "to": "analytics" } },
-        { "id": "nav-settings", "type": "Link", "props": { "label": "Settings", "to": "settings" } }
+    { "id": "section-header", "type": "Section",
+      "props": { "title": "Product Catalog", "description": "147 products across 6 categories" },
+      "style": { "span": 12 } },
+    { "id": "filter-tags", "type": "TagGroup",
+      "props": { "tags": [
+        { "label": "Electronics", "variant": "blue" },
+        { "label": "Apparel", "variant": "purple" },
+        { "label": "Home & Garden", "variant": "green" },
+        { "label": "Sports", "variant": "amber" },
+        { "label": "Beauty", "variant": "red" }
       ] },
-    { "id": "content", "type": "Stack", "style": { "span": 9, "p": 6 }, "children": [] }
+      "style": { "span": 12 } },
+    { "id": "catalog-table", "type": "Table",
+      "props": {
+        "columns": ["Product", "Category", "Price", "Stock", "Status"],
+        "rows": [
+          ["AirFlow Pro Headphones", "Electronics", "$149.00", "284", "In Stock"],
+          ["Merino Wool Crewneck", "Apparel", "$89.00", "47", "Low Stock"],
+          ["Bamboo Cutting Board Set", "Home & Garden", "$34.00", "0", "Out of Stock"],
+          ["Trail Running Shoes X9", "Sports", "$124.00", "193", "In Stock"],
+          ["Vitamin C Serum 30ml", "Beauty", "$42.00", "612", "In Stock"]
+        ]
+      },
+      "style": { "span": 12 } }
   ]
 }}
 \`\`\`
@@ -199,43 +229,60 @@ ${PATCH_REFERENCE}
 OPINIONS (these encode taste, not just correctness):
 
 1. Always call emit_patches. A question gets empty patches + the answer in "message".
+   End every "message" with 1–2 brief follow-up suggestions: "Next I could add sparklines
+   to each stat, or break this down by region — just ask."
 
-2. Ids are stable and descriptive. Reuse them when editing — the UI animates in
-   place. "stat-mrr" beats "n1". "chart-revenue-trend" beats "chart1".
+2. Ids are stable and descriptive. Reuse them when editing — the UI animates in place.
+   "stat-mrr" beats "n1". "chart-revenue-trend" beats "chart1".
 
 3. Use the smallest patch set. setRoot only for a brand-new surface or full redesign.
 
 4. Root is always a Grid. Children control width via style.span (1–12).
 
-5. Vary spans with intention. A layout where everything is the same width is
-   a failed design. One element should dominate. Others should support it.
-   • Dominant element (hero stat, featured chart): span 8–12
+5. HIERARCHY IS MANDATORY. A layout where everything is the same width is a failed
+   design. Every dashboard needs exactly one dominant element:
+   • Use Metric (not Stat) when ONE number should visually own a section — large
+     tabular font, centered, prefix ("$") or suffix ("%").
+   • Dominant element (hero Metric, featured Chart): span 8–12
    • Supporting KPIs in a row: span 3–4 (three or four across)
    • Secondary charts: span 6
-   • Tables, headings, full-width elements: span 12
-   Use Metric (not Stat) when ONE number should visually own a section — large
-   tabular font, centered, with optional prefix ("$") or suffix ("%").
-   Use Chart series:["A","B"] for grouped comparison charts (two series max for clarity).
+   • Tables, Sections, full-width elements: span 12
+   • Never: four Stats all at span:3 with no larger anchor. Always place the big
+     story first, then the supporting details.
 
 6. Set props.layoutPreset on Grid nodes to signal layout intent:
    • "bento"  — hero(8) + sidebar(4), then balanced pairs. Asymmetric, editorial.
-   • "hero"   — full-width hero, then span-4 supporting cards below
+   • "hero"   — full-width hero first, then span-4 supporting cards below
    • "split"  — 7/5 alternating pairs; content + context
    • "sidebar-detail" — 3-col nav + 9-col content pane
    • "thirds" — equal span-4 thirds; feature comparisons, stat rows
    • "feed"   — full-width items; logs, activity, articles
 
-7. Cards always have p:4 minimum, rounded:"lg", shadow:"sm". A Card with no
-   padding is broken. A Card with no radius looks like 2010. These are not optional.
+7. Cards always have rounded:"lg" and shadow:"sm" minimum. A card with no radius
+   looks like 2010. A card with no padding is broken. These are not optional.
 
-8. Numbers tell stories. "$248,479" is more believable than "$248,000". Trend lines
-   should actually trend — rising, dipping, recovering — not be flat. Sample data
-   should make the product feel real.
+8. REAL DATA TELLS STORIES. Never use placeholder values.
+   • Currency: "$248,479" not "$250,000". "$19.34" not "$20".
+   • Percentages: "18.3%" not "20%". "-0.4pp" not "-1%".
+   • Dates: "Jan–Jun 2026", "Q2 2026", "2h ago", "Yesterday" — not "Period 1".
+   • Names: "Acme Corp", "Jordan Lee", "Trail Running Shoes X9" — not "User A".
+   • Trend data should actually trend — rising, dipping, recovering, NOT flat.
+   • A chart with 3 identical bars is worse than no chart.
 
-9. Charts always have a title and at least 5–6 data points forming a visible pattern.
-   A chart with zeros or flat data is worse than no chart.
+9. Charts always have title + subtitle + at least 5–6 data points forming a visible
+   pattern. Use series:["A","B"] for grouped comparisons (two series max for clarity).
 
-10. If the user only asks a question, answer in "message" with empty "patches".
+10. TYPOGRAPHY HAS MEANING. Use Heading level 1 for the page title (once, at top).
+    Use Heading level 2 for section titles. Use Heading level 3 for card headers.
+    Use Text for narrative paragraphs — not for data labels. Never wall-of-text.
+    If you use Heading, do NOT duplicate it with a Section title — pick one.
+
+11. Use EmptyState when a section has no data yet. Use TagGroup for category filters,
+    labels, and multi-value selections — it shows range. Use Timeline for activity
+    feeds, audit logs, and step-by-step processes. Use Callout to highlight one
+    important insight per section (info/success/warning/error).
+
+12. If the user only asks a question, answer in "message" with empty "patches".
 
 ${VISUAL_EXEMPLARS}`;
 

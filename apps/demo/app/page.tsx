@@ -17,21 +17,106 @@ const SLOW = [0.22, 1, 0.36, 1] as const;
 
 const SUGGESTIONS = [
   {
-    label: "a SaaS revenue dashboard",
-    prompt: "Build a SaaS revenue dashboard with MRR, churn, and active users",
+    label: "SaaS revenue dashboard",
+    prompt: "Build a SaaS revenue dashboard with MRR, churn rate, and active users. Use a bento layout with a hero metric and a 6-month area chart.",
     seedId: "revenue",
   },
   {
-    label: "a fitness tracker",
-    prompt: "Build a fitness tracker dashboard with steps, sleep and heart rate",
+    label: "Fitness tracker",
+    prompt: "Build a fitness tracker with steps, sleep score, and heart rate. Include a weekly activity timeline and ring progress for daily goals.",
     seedId: "fitness",
   },
   {
-    label: "a content analytics view",
-    prompt: "Build a content analytics dashboard with views, CTR, and watch time",
+    label: "Content analytics",
+    prompt: "Build a content analytics dashboard with views, CTR, watch time, and top posts. Include a multi-series chart comparing this month vs last month.",
     seedId: "content",
   },
+  {
+    label: "Sales pipeline",
+    prompt: "Build a sales pipeline dashboard with deals by stage, monthly close rate, quota attainment, and a table of top opportunities.",
+    seedId: "revenue",
+  },
+  {
+    label: "Team performance",
+    prompt: "Build a team performance dashboard showing individual contributor stats, sprint velocity, and a completion stepper for the current quarter.",
+    seedId: "content",
+  },
+  {
+    label: "Personal finance",
+    prompt: "Build a personal finance dashboard with budget categories, net savings rate, spending by category as a donut chart, and a monthly trend line.",
+    seedId: "fitness",
+  },
 ];
+
+const PLACEHOLDERS = [
+  "Build a SaaS metrics dashboard with MRR and churn…",
+  "Show team performance with individual contributor stats…",
+  "Create a personal finance view with budget categories…",
+  "Design a product analytics dashboard with conversion funnel…",
+];
+
+// Walk the dashboard tree and collect component types used
+function collectTypes(node: { type: string; children?: typeof node[] }): Set<string> {
+  const types = new Set<string>();
+  function walk(n: typeof node) {
+    types.add(n.type);
+    for (const child of n.children ?? []) walk(child);
+  }
+  walk(node);
+  return types;
+}
+
+function getFollowUpChips(root: { type: string; children?: typeof root[] }) {
+  const types = collectTypes(root);
+  const chips: Array<{ label: string; prompt: string }> = [];
+
+  if (types.has("Stat") && !types.has("Metric")) {
+    chips.push({
+      label: "Hero-ify top stat",
+      prompt: "Convert the single most important stat into a hero Metric that dominates the top — large, centered, with a trend description below it.",
+    });
+  }
+  if (types.has("Chart") || types.has("Stat")) {
+    if (!types.has("Sparkline")) {
+      chips.push({
+        label: "Add sparklines",
+        prompt: "Add a compact sparkline trend line to each stat showing the past 8 periods of data.",
+      });
+    }
+  }
+  if (!types.has("Timeline")) {
+    chips.push({
+      label: "Add activity feed",
+      prompt: "Add a recent activity timeline on the right side with 4–5 realistic recent events, each with a timestamp and status (done/current/pending).",
+    });
+  }
+  if (!types.has("Callout")) {
+    chips.push({
+      label: "Surface key insight",
+      prompt: "Add a success or warning Callout highlighting the single most important insight from this data — one sentence, actionable.",
+    });
+  }
+  if (types.has("Table") && !types.has("TagGroup")) {
+    chips.push({
+      label: "Add category filters",
+      prompt: "Add a TagGroup above the table with color-coded category filter chips based on the data in the table.",
+    });
+  }
+  if (!types.has("RingProgress")) {
+    chips.push({
+      label: "Add ring progress",
+      prompt: "Add a RingProgress showing the most important completion rate or percentage metric, sized lg.",
+    });
+  }
+
+  // Always offer a refinement
+  chips.push({
+    label: "Apply dark theme",
+    prompt: "Make this dashboard feel more premium — deepen the background, add subtle shadows to every card, increase visual contrast across all elements.",
+  });
+
+  return chips.slice(0, 5);
+}
 
 export default function Page() {
   const {
@@ -51,8 +136,26 @@ export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [phIdx, setPhIdx] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load shared dashboard from URL param on mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const d = params.get("d");
+      if (d) {
+        const parsed = JSON.parse(atob(d));
+        setDashboard(parsed);
+      }
+    } catch {
+      /* invalid param — ignore */
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -82,22 +185,39 @@ export default function Page() {
     return () => window.removeEventListener("keydown", handler);
   }, [sidebarOpen]);
 
+  // Cycle placeholder while input is empty and unfocused
+  useEffect(() => {
+    if (inputFocused || input) return;
+    const id = setInterval(() => setPhIdx((i) => (i + 1) % PLACEHOLDERS.length), 3500);
+    return () => clearInterval(id);
+  }, [inputFocused, input]);
+
   const submit = async (text: string) => {
     setInput("");
     await sendMessage(text);
   };
 
-  const useSeed = (label: string, prompt: string, seedId: string) => {
+  const useSeed = (prompt: string, seedId: string) => {
     const seed = seeds.find((s) => s.id === seedId);
     if (seed) setDashboard(seed.dashboard);
-    void sendMessage(
-      `${prompt}. The current dashboard is already a starting point — refine it.`,
-    );
-    void label;
+    void sendMessage(`${prompt}. The current layout is a starting point — make it excellent.`);
+  };
+
+  const share = async () => {
+    try {
+      const encoded = btoa(JSON.stringify(dashboard));
+      const url = `${window.location.origin}${window.location.pathname}?d=${encoded}`;
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      /* clipboard denied */
+    }
   };
 
   const isEmpty = (dashboard.root.children?.length ?? 0) === 0;
   const brand = brandPresets[brandName];
+  const followUpChips = !isEmpty && !isLoading ? getFollowUpChips(dashboard.root) : [];
 
   const exportJson = JSON.stringify(dashboard, null, 2);
   const copyExport = async () => {
@@ -121,12 +241,20 @@ export default function Page() {
         </div>
         <div className="flex items-center gap-1">
           {!isEmpty && (
-            <button
-              onClick={reset}
-              className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Start over
-            </button>
+            <>
+              <button
+                onClick={share}
+                className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {shareCopied ? "Link copied" : "Share"}
+              </button>
+              <button
+                onClick={reset}
+                className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Start over
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -161,7 +289,7 @@ export default function Page() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Conversation */}
+        {/* Conversation sidebar */}
         <aside className={cn(
           "flex flex-col transition-all duration-300",
           sidebarOpen ? "w-[440px] min-w-[280px]" : "w-0 overflow-hidden",
@@ -171,11 +299,9 @@ export default function Page() {
             ref={scrollRef}
             className="flex-1 space-y-6 overflow-y-auto px-8 pb-6"
           >
-            {messages.length === 0 && !isEmpty && null}
-
             {messages.length === 0 && isEmpty && (
               <p className="mt-8 max-w-[28ch] text-[13.5px] leading-relaxed text-muted-foreground">
-                Describe what you want, and the surface on the right takes
+                Describe what you want, and the canvas on the right takes
                 shape. Every follow-up edits it in place.
               </p>
             )}
@@ -216,6 +342,35 @@ export default function Page() {
               </motion.p>
             )}
 
+            {/* Post-generation contextual chips */}
+            <AnimatePresence>
+              {followUpChips.length > 0 && (
+                <motion.div
+                  key="followup"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4, ease: SLOW as never }}
+                  className="flex flex-wrap gap-2 pt-1"
+                >
+                  {followUpChips.map((chip) => (
+                    <button
+                      key={chip.label}
+                      onClick={() => submit(chip.prompt)}
+                      disabled={isLoading}
+                      className={cn(
+                        "rounded-full border border-border/60 px-3 py-1 text-[12px] font-medium text-muted-foreground",
+                        "transition-all hover:border-foreground/25 hover:text-foreground hover:bg-foreground/[0.03]",
+                        "disabled:opacity-40 disabled:pointer-events-none",
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {error && (
               <p className="text-[13px] leading-relaxed text-danger">{error}</p>
             )}
@@ -233,6 +388,8 @@ export default function Page() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -240,8 +397,8 @@ export default function Page() {
                   }
                 }}
                 rows={1}
-                placeholder="What should it show?"
-                className="flex-1 resize-none bg-transparent text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/50"
+                placeholder={PLACEHOLDERS[phIdx]}
+                className="flex-1 resize-none bg-transparent text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/40 placeholder:transition-all"
               />
               <button
                 type="submit"
@@ -251,6 +408,9 @@ export default function Page() {
               >
                 Send
               </button>
+            </div>
+            <div className="mt-2 text-[11px] text-muted-foreground/40">
+              ↵ send · ⌘K focus · Esc clear
             </div>
           </form>
         </aside>
@@ -286,7 +446,21 @@ export default function Page() {
               )}
             </svg>
           </button>
-          <div className="relative px-12 pb-16 pt-8">
+          <div className={cn(
+            "relative px-12 pb-16 pt-8",
+            isEmpty && "min-h-full",
+          )}>
+            {/* Dot grid — visible when canvas is empty */}
+            {isEmpty && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.035]"
+                style={{
+                  backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)",
+                  backgroundSize: "28px 28px",
+                }}
+              />
+            )}
             <AnimatePresence mode="wait">
               {isEmpty ? (
                 <motion.div
@@ -295,7 +469,7 @@ export default function Page() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.6, ease: SLOW as never }}
-                  className="mx-auto max-w-2xl pt-20"
+                  className="relative mx-auto max-w-2xl pt-20"
                 >
                   <motion.h1
                     initial={{ opacity: 0, y: 8 }}
@@ -310,37 +484,35 @@ export default function Page() {
                   <motion.p
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.7,
-                      ease: SLOW as never,
-                      delay: 0.1,
-                    }}
-                    className="mt-6 max-w-md text-[15px] leading-relaxed text-muted-foreground"
+                    transition={{ duration: 0.7, ease: SLOW as never, delay: 0.08 }}
+                    className="mt-5 max-w-sm text-[16px] leading-relaxed text-muted-foreground"
                   >
-                    Describe what you want.
+                    Describe a dashboard. Watch it appear — every follow-up
+                    edits it in place.
                   </motion.p>
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{
-                      duration: 0.6,
-                      ease: SLOW as never,
-                      delay: 0.25,
-                    }}
-                    className="mt-12 space-y-3 text-[14px]"
+                    transition={{ duration: 0.6, ease: SLOW as never, delay: 0.2 }}
+                    className="mt-12 space-y-3"
                   >
-                    <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
-                      Or start with
+                    <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
+                      Start with
                     </div>
-                    {SUGGESTIONS.map((s) => (
-                      <button
-                        key={s.label}
-                        onClick={() => useSeed(s.label, s.prompt, s.seedId)}
-                        className="block text-left text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        <span className="text-foreground/40">→</span> {s.label}
-                      </button>
-                    ))}
+                    <div className="flex flex-wrap gap-2">
+                      {SUGGESTIONS.map((s) => (
+                        <button
+                          key={s.label}
+                          onClick={() => useSeed(s.prompt, s.seedId)}
+                          className={cn(
+                            "rounded-full border border-border/60 px-3.5 py-1.5 text-[13px] font-medium text-muted-foreground",
+                            "transition-all hover:border-foreground/25 hover:text-foreground hover:bg-foreground/[0.03]",
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
                   </motion.div>
                 </motion.div>
               ) : (
@@ -453,10 +625,11 @@ export default function Page() {
               <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
                 <div>
                   <div className="font-display text-[15px] font-medium tracking-tight">
-                    Export
+                    Export spec
                   </div>
                   <div className="text-[12px] text-muted-foreground">
-                    Paste into your app or version it.
+                    Paste into your app as{" "}
+                    <code className="font-mono text-[11px]">&lt;DashboardRenderer dashboard={"{spec}"} /&gt;</code>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
