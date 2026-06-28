@@ -115,9 +115,9 @@ export const revenueSeed: Dashboard = {
         id: "expansion-callout",
         type: "Callout",
         props: {
-          intent: "success",
+          variant: "success",
           title: "Expansion revenue up 31%",
-          message:
+          content:
             "Upsells to Enterprise plan are outpacing new logo growth. Consider doubling down on in-app upgrade prompts.",
         },
         style: { span: 4 },
@@ -213,9 +213,9 @@ export const fitnessSeed: Dashboard = {
         id: "recovery-callout",
         type: "Callout",
         props: {
-          intent: "warning",
+          variant: "warning",
           title: "Recovery score low today",
-          message: "HRV is 14% below your baseline. Consider a rest day or light activity only.",
+          content: "HRV is 14% below your baseline. Consider a rest day or light activity only.",
         },
         style: { span: 12 },
       },
@@ -249,28 +249,28 @@ export const fitnessSeed: Dashboard = {
               title: "Tempo run",
               description: "5.2 km · 28 min",
               timestamp: "Today, 7:14 AM",
-              icon: "🏃",
+              status: "current",
             },
             {
               id: "w2",
               title: "Weight training",
               description: "Upper body · 52 min",
               timestamp: "Yesterday",
-              icon: "🏋️",
+              status: "done",
             },
             {
               id: "w3",
               title: "Yoga",
               description: "Flexibility · 30 min",
               timestamp: "2 days ago",
-              icon: "🧘",
+              status: "done",
             },
             {
               id: "w4",
               title: "Rest day",
               description: "Active recovery walk",
               timestamp: "3 days ago",
-              icon: "🚶",
+              status: "done",
             },
           ],
         },
@@ -373,9 +373,9 @@ export const contentSeed: Dashboard = {
         id: "virality-callout",
         type: "Callout",
         props: {
-          intent: "info",
+          variant: "info",
           title: "One post is driving 22% of views",
-          message:
+          content:
             '"How we rebuilt search" went viral on Hacker News on Dec 19. Views are stabilizing — 3-day rolling average is normalizing.',
         },
         style: { span: 4 },

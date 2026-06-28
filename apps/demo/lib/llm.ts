@@ -24,5 +24,8 @@ export function getClient(): LLMClient {
 }
 
 export const AGENT_INSTRUCTIONS =
-  "Favor clean, balanced dashboards. Default to dark-mode-friendly content. " +
-  "When the user is vague, make tasteful assumptions and pick sensible sample data.";
+  "Favor editorial, magazine-quality layouts — not spreadsheets. " +
+  "Use real-looking data with specific numbers. " +
+  "When the user is vague, make bold, opinionated design choices and explain them briefly. " +
+  "Always open with the most important number as a Metric or large Chart, then support it with Stats. " +
+  "Default to bento or hero layoutPreset for visual richness.";

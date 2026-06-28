@@ -12,6 +12,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { seeds } from "@/lib/presets";
+import type { Dashboard } from "@autogen-ui/core";
 
 const SLOW = [0.22, 1, 0.36, 1] as const;
 
@@ -55,6 +56,15 @@ const PLACEHOLDERS = [
   "Design a product analytics dashboard with conversion funnel…",
 ];
 
+const STATUS_MESSAGES = [
+  "Thinking…",
+  "Designing the layout…",
+  "Selecting components…",
+  "Building the structure…",
+  "Placing the data…",
+  "Fine-tuning details…",
+];
+
 // Walk the dashboard tree and collect component types used
 function collectTypes(node: { type: string; children?: typeof node[] }): Set<string> {
   const types = new Set<string>();
@@ -76,13 +86,11 @@ function getFollowUpChips(root: { type: string; children?: typeof root[] }) {
       prompt: "Convert the single most important stat into a hero Metric that dominates the top — large, centered, with a trend description below it.",
     });
   }
-  if (types.has("Chart") || types.has("Stat")) {
-    if (!types.has("Sparkline")) {
-      chips.push({
-        label: "Add sparklines",
-        prompt: "Add a compact sparkline trend line to each stat showing the past 8 periods of data.",
-      });
-    }
+  if ((types.has("Chart") || types.has("Stat")) && !types.has("Sparkline")) {
+    chips.push({
+      label: "Add sparklines",
+      prompt: "Add a compact sparkline trend line to each stat showing the past 8 periods of data.",
+    });
   }
   if (!types.has("Timeline")) {
     chips.push({
@@ -109,7 +117,6 @@ function getFollowUpChips(root: { type: string; children?: typeof root[] }) {
     });
   }
 
-  // Always offer a refinement
   chips.push({
     label: "Apply dark theme",
     prompt: "Make this dashboard feel more premium — deepen the background, add subtle shadows to every card, increase visual contrast across all elements.",
@@ -125,6 +132,7 @@ export default function Page() {
     isLoading,
     error,
     sendMessage,
+    cancel,
     setDashboard,
     reset,
   } = useStreamingDashboard();
@@ -139,8 +147,14 @@ export default function Page() {
   const [shareCopied, setShareCopied] = useState(false);
   const [phIdx, setPhIdx] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
+  const [statusIdx, setStatusIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Undo stack — up to 8 previous dashboard states
+  const undoStack = useRef<Dashboard[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Load shared dashboard from URL param on mount
   useEffect(() => {
@@ -148,7 +162,7 @@ export default function Page() {
       const params = new URLSearchParams(window.location.search);
       const d = params.get("d");
       if (d) {
-        const parsed = JSON.parse(atob(d));
+        const parsed = JSON.parse(atob(d)) as Dashboard;
         setDashboard(parsed);
       }
     } catch {
@@ -168,6 +182,13 @@ export default function Page() {
     });
   }, [messages, isLoading]);
 
+  // Cycle animated status message while generating
+  useEffect(() => {
+    if (!isLoading) { setStatusIdx(0); return; }
+    const id = setInterval(() => setStatusIdx((i) => (i + 1) % STATUS_MESSAGES.length), 2200);
+    return () => clearInterval(id);
+  }, [isLoading]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
@@ -180,10 +201,19 @@ export default function Page() {
         setInput("");
         inputRef.current?.blur();
       }
+      // ⌘Z undo
+      if (meta && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        if (undoStack.current.length > 0) {
+          const prev = undoStack.current.pop()!;
+          setDashboard(prev);
+          setCanUndo(undoStack.current.length > 0);
+        }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [sidebarOpen]);
+  }, [sidebarOpen, setDashboard]);
 
   // Cycle placeholder while input is empty and unfocused
   useEffect(() => {
@@ -193,13 +223,29 @@ export default function Page() {
   }, [inputFocused, input]);
 
   const submit = async (text: string) => {
+    // Snapshot current dashboard for undo
+    undoStack.current = [...undoStack.current.slice(-7), dashboard];
+    setCanUndo(false); // disable during load, re-enable on success
+
     setInput("");
     await sendMessage(text);
+
+    setCanUndo(undoStack.current.length > 0);
+  };
+
+  const handleUndo = () => {
+    if (undoStack.current.length === 0) return;
+    const prev = undoStack.current.pop()!;
+    setDashboard(prev);
+    setCanUndo(undoStack.current.length > 0);
   };
 
   const useSeed = (prompt: string, seedId: string) => {
     const seed = seeds.find((s) => s.id === seedId);
-    if (seed) setDashboard(seed.dashboard);
+    if (seed) {
+      undoStack.current = [...undoStack.current.slice(-7), dashboard];
+      setDashboard(seed.dashboard);
+    }
     void sendMessage(`${prompt}. The current layout is a starting point — make it excellent.`);
   };
 
@@ -230,6 +276,32 @@ export default function Page() {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+  const downloadPng = async () => {
+    if (!canvasRef.current || exporting) return;
+    setExporting(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const bg = getComputedStyle(canvasRef.current).backgroundColor;
+      const canvas = await html2canvas(canvasRef.current, {
+        backgroundColor: bg || "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        windowWidth: canvasRef.current.scrollWidth,
+        windowHeight: canvasRef.current.scrollHeight,
+      });
+      const link = document.createElement("a");
+      link.download = `${dashboard.title ?? "dashboard"}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch {
+      /* export failed — silently no-op */
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <BrandProvider
       kit={brand}
@@ -246,8 +318,17 @@ export default function Page() {
                 onClick={share}
                 className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
-                {shareCopied ? "Link copied" : "Share"}
+                {shareCopied ? "✓ Copied" : "Share"}
               </button>
+              {canUndo && (
+                <button
+                  onClick={handleUndo}
+                  title="Undo last change (⌘Z)"
+                  className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Undo
+                </button>
+              )}
               <button
                 onClick={reset}
                 className="rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -330,17 +411,55 @@ export default function Page() {
               ),
             )}
 
-            {isLoading && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="text-[13px] text-muted-foreground/60 italic"
-              >
-                Building…
-              </motion.p>
-            )}
+            <AnimatePresence mode="popLayout">
+              {isLoading && (
+                <motion.div
+                  key="status"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    {/* Animated dots */}
+                    <span className="flex gap-[3px]">
+                      {[0, 1, 2].map((i) => (
+                        <motion.span
+                          key={i}
+                          className="block h-1 w-1 rounded-full bg-muted-foreground/50"
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{
+                            repeat: Infinity,
+                            duration: 1.2,
+                            delay: i * 0.2,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      ))}
+                    </span>
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={statusIdx}
+                        initial={{ opacity: 0, y: 3 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -3 }}
+                        transition={{ duration: 0.3 }}
+                        className="text-[13px] text-muted-foreground/60 italic"
+                      >
+                        {STATUS_MESSAGES[statusIdx]}
+                      </motion.span>
+                    </AnimatePresence>
+                  </div>
+                  <button
+                    onClick={cancel}
+                    className="text-[11px] text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+                  >
+                    Cancel
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Post-generation contextual chips */}
             <AnimatePresence>
@@ -372,14 +491,20 @@ export default function Page() {
             </AnimatePresence>
 
             {error && (
-              <p className="text-[13px] leading-relaxed text-danger">{error}</p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="rounded-lg bg-danger/5 px-3 py-2 text-[13px] leading-relaxed text-danger"
+              >
+                {error}
+              </motion.p>
             )}
           </div>
 
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (input.trim()) submit(input);
+              if (input.trim()) void submit(input);
             }}
             className="px-8 pb-8 pt-2"
           >
@@ -393,7 +518,7 @@ export default function Page() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    if (input.trim()) submit(input);
+                    if (input.trim()) void submit(input);
                   }
                 }}
                 rows={1}
@@ -409,8 +534,11 @@ export default function Page() {
                 Send
               </button>
             </div>
-            <div className="mt-2 text-[11px] text-muted-foreground/40">
-              ↵ send · ⌘K focus · Esc clear
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground/40">
+              <span>↵ send · ⌘K focus · Esc clear</span>
+              {canUndo && !isLoading && (
+                <span>⌘Z undo</span>
+              )}
             </div>
           </form>
         </aside>
@@ -446,10 +574,13 @@ export default function Page() {
               )}
             </svg>
           </button>
-          <div className={cn(
-            "relative px-12 pb-16 pt-8",
-            isEmpty && "min-h-full",
-          )}>
+          <div
+            ref={canvasRef}
+            className={cn(
+              "relative px-12 pb-16 pt-8",
+              isEmpty && "min-h-full",
+            )}
+          >
             {/* Dot grid — visible when canvas is empty */}
             {isEmpty && (
               <div
@@ -584,16 +715,29 @@ export default function Page() {
               {!isEmpty && (
                 <>
                   <div className="mt-5 h-px bg-border/60" />
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setExportOpen(true);
-                    }}
-                    className="mt-4 flex w-full items-center justify-between text-[13px] text-foreground/70 transition-colors hover:text-foreground"
-                  >
-                    <span>Export spec</span>
-                    <span className="text-foreground/30">→</span>
-                  </button>
+                  <div className="mt-4 space-y-1">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setExportOpen(true);
+                      }}
+                      className="flex w-full items-center justify-between text-[13px] text-foreground/70 transition-colors hover:text-foreground"
+                    >
+                      <span>Export spec</span>
+                      <span className="text-foreground/30">→</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void downloadPng();
+                      }}
+                      disabled={exporting}
+                      className="flex w-full items-center justify-between text-[13px] text-foreground/70 transition-colors hover:text-foreground disabled:opacity-50"
+                    >
+                      <span>{exporting ? "Exporting…" : "Download PNG"}</span>
+                      <span className="text-foreground/30">↓</span>
+                    </button>
+                  </div>
                 </>
               )}
             </motion.div>
@@ -637,7 +781,7 @@ export default function Page() {
                     onClick={copyExport}
                     className="rounded-md px-3 py-1.5 text-[12px] font-medium text-foreground/70 transition-colors hover:text-foreground"
                   >
-                    {copied ? "Copied" : "Copy"}
+                    {copied ? "✓ Copied" : "Copy"}
                   </button>
                   <button
                     onClick={() => setExportOpen(false)}
