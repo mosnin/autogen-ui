@@ -111,13 +111,13 @@ EXEMPLARS — study the proportions, the data specificity, the intentional hiera
       "props": { "label": "Monthly Recurring Revenue", "value": "$248,479", "suffix": "", "description": "+18.3% vs Jan 2026", "trend": "up" },
       "style": { "span": 12 } },
     { "id": "stat-users", "type": "Stat",
-      "props": { "label": "Active Users", "value": "12,840", "delta": "+4.2%", "trend": "up" },
+      "props": { "label": "Active Users", "value": "12,840", "delta": "+4.2%", "trend": "up", "sparkline": [10200, 10800, 11100, 11600, 12000, 12400, 12840] },
       "style": { "span": 4, "rounded": "lg", "shadow": "sm" } },
     { "id": "stat-churn", "type": "Stat",
-      "props": { "label": "Churn Rate", "value": "2.1%", "delta": "-0.4pp", "trend": "down" },
+      "props": { "label": "Churn Rate", "value": "2.1%", "delta": "-0.4pp", "trend": "down", "sparkline": [3.2, 3.0, 2.8, 2.6, 2.5, 2.3, 2.1] },
       "style": { "span": 4, "rounded": "lg", "shadow": "sm" } },
     { "id": "stat-arpu", "type": "Stat",
-      "props": { "label": "ARPU", "value": "$19.34", "delta": "+$1.20", "trend": "up" },
+      "props": { "label": "ARPU", "value": "$19.34", "delta": "+$1.20", "trend": "up", "sparkline": [16.2, 17.1, 17.8, 18.0, 18.5, 18.9, 19.34] },
       "style": { "span": 4, "rounded": "lg", "shadow": "sm" } }
   ]
 }}
@@ -283,6 +283,12 @@ OPINIONS (these encode taste, not just correctness):
     important insight per section (info/success/warning/error).
 
 12. If the user only asks a question, answer in "message" with empty "patches".
+
+13. DATA DENSITY WITHOUT CLUTTER. Stats are more alive with a mini-trend:
+    add "sparkline": [n1, n2, ..., n7] to any Stat prop to show the last 7 periods
+    in the top-right corner — no extra space needed. Use RingProgress for percentages
+    and completion rates (goals, NPS, utilization). Both add information density
+    without adding noise. Default to including sparkline on every KPI Stat.
 
 ${VISUAL_EXEMPLARS}`;
 
