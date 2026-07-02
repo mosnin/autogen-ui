@@ -6,6 +6,7 @@ import type {
   LLMTool,
 } from "../llm";
 import { systemToString } from "../llm";
+import { resilientFetch, type RetryPolicy } from "./http";
 
 /**
  * Groq client — Groq exposes an OpenAI-compatible chat completions endpoint
@@ -22,6 +23,8 @@ export interface GroqClientOptions {
   model?: string;
   /** Defaults to `https://api.groq.com`. */
   baseUrl?: string;
+  /** Retry/backoff/timeout policy. Sensible defaults; see RetryPolicy. */
+  retry?: RetryPolicy;
 }
 
 function buildGroqBody(
@@ -62,6 +65,7 @@ export function createGroqClient(opts: GroqClientOptions): LLMClient {
   const model = opts.model ?? "llama-3.3-70b-versatile";
   const baseUrl = opts.baseUrl ?? "https://api.groq.com";
   const url = `${baseUrl}/openai/v1/chat/completions`;
+  const retry = opts.retry;
   const headers: HeadersInit = {
     "content-type": "application/json",
     authorization: `Bearer ${opts.apiKey}`,
@@ -71,16 +75,13 @@ export function createGroqClient(opts: GroqClientOptions): LLMClient {
     name: `groq:${model}`,
 
     async complete(req): Promise<LLMResult> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildGroqBody(req, model, false)),
-      });
-      if (!res.ok) {
-        throw new Error(
-          `[autogen-ui] Groq ${res.status}: ${await res.text()}`,
-        );
-      }
+      const res = await resilientFetch(
+        url,
+        { method: "POST", headers, body: JSON.stringify(buildGroqBody(req, model, false)) },
+        "Groq",
+        retry,
+        req.signal,
+      );
       const data = (await res.json()) as {
         choices?: Array<{
           message?: {
@@ -111,18 +112,21 @@ export function createGroqClient(opts: GroqClientOptions): LLMClient {
     },
 
     async *stream(req): AsyncIterable<LLMEvent> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildGroqBody(req, model, true)),
-      });
-      if (!res.ok || !res.body) {
-        yield {
-          kind: "error",
-          error: `[autogen-ui] Groq ${res.status}: ${await res
-            .text()
-            .catch(() => "")}`,
-        };
+      let res: Response;
+      try {
+        res = await resilientFetch(
+          url,
+          { method: "POST", headers, body: JSON.stringify(buildGroqBody(req, model, true)) },
+          "Groq",
+          retry,
+          req.signal,
+        );
+      } catch (err) {
+        yield { kind: "error", error: err instanceof Error ? err.message : String(err) };
+        return;
+      }
+      if (!res.body) {
+        yield { kind: "error", error: "[autogen-ui] Groq: empty response body" };
         return;
       }
 

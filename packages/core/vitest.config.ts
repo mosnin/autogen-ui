@@ -38,6 +38,7 @@ export default defineConfig({
         "src/server-render.ts": { lines: 90, functions: 90 },
         "src/renderer.tsx": { lines: 78 },
         "src/data.ts": { lines: 44 },
+        "src/clients/http.ts": { lines: 85, functions: 85 },
       },
     },
   },

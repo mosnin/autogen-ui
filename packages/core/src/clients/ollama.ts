@@ -7,6 +7,7 @@ import type {
   ToolCall,
 } from "../llm";
 import { systemToString } from "../llm";
+import { resilientFetch, type RetryPolicy } from "./http";
 
 /**
  * Ollama client — talks to a local Ollama server's `/api/chat` endpoint with
@@ -26,6 +27,8 @@ export interface OllamaClientOptions {
   /** Defaults to `llama3.2`. */
   model?: string;
   maxTokens?: number;
+  /** Retry/backoff/timeout policy. Sensible defaults; see RetryPolicy. */
+  retry?: RetryPolicy;
 }
 
 interface OllamaToolCall {
@@ -114,6 +117,7 @@ export function createOllamaClient(opts: OllamaClientOptions = {}): LLMClient {
   const model = opts.model ?? "llama3.2";
   const maxTokens = opts.maxTokens ?? 4096;
   const url = `${baseUrl}/api/chat`;
+  const retry = opts.retry;
   const headers: HeadersInit = {
     "content-type": "application/json",
   };
@@ -122,16 +126,13 @@ export function createOllamaClient(opts: OllamaClientOptions = {}): LLMClient {
     name: `ollama:${model}`,
 
     async complete(req): Promise<LLMResult> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildOllamaBody(req, model, maxTokens, false)),
-      });
-      if (!res.ok) {
-        throw new Error(
-          `[autogen-ui] Ollama ${res.status}: ${await res.text()}`,
-        );
-      }
+      const res = await resilientFetch(
+        url,
+        { method: "POST", headers, body: JSON.stringify(buildOllamaBody(req, model, maxTokens, false)) },
+        "Ollama",
+        retry,
+        req.signal,
+      );
       const data = (await res.json()) as OllamaChatChunk;
       const text = data.message?.content ?? "";
       const toolCalls = normalizeToolCalls(data.message?.tool_calls);
@@ -139,18 +140,21 @@ export function createOllamaClient(opts: OllamaClientOptions = {}): LLMClient {
     },
 
     async *stream(req): AsyncIterable<LLMEvent> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildOllamaBody(req, model, maxTokens, true)),
-      });
-      if (!res.ok || !res.body) {
-        yield {
-          kind: "error",
-          error: `[autogen-ui] Ollama ${res.status}: ${await res
-            .text()
-            .catch(() => "")}`,
-        };
+      let res: Response;
+      try {
+        res = await resilientFetch(
+          url,
+          { method: "POST", headers, body: JSON.stringify(buildOllamaBody(req, model, maxTokens, true)) },
+          "Ollama",
+          retry,
+          req.signal,
+        );
+      } catch (err) {
+        yield { kind: "error", error: err instanceof Error ? err.message : String(err) };
+        return;
+      }
+      if (!res.body) {
+        yield { kind: "error", error: "[autogen-ui] Ollama: empty response body" };
         return;
       }
 

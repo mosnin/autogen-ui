@@ -7,6 +7,7 @@ import type {
   LLMTool,
 } from "../llm";
 import { systemToSegments } from "../llm";
+import { resilientFetch, type RetryPolicy } from "./http";
 
 /**
  * Thin, dependency-free LLM clients (Anthropic + OpenAI), implementing the
@@ -24,6 +25,8 @@ export interface AnthropicClientOptions {
   model?: string;
   maxTokens?: number;
   baseUrl?: string;
+  /** Retry/backoff/timeout policy. Sensible defaults; see RetryPolicy. */
+  retry?: RetryPolicy;
 }
 
 function buildAnthropicBody(
@@ -76,6 +79,7 @@ export function createAnthropicClient(opts: AnthropicClientOptions): LLMClient {
   const maxTokens = opts.maxTokens ?? 4096;
   const baseUrl = opts.baseUrl ?? "https://api.anthropic.com";
   const url = `${baseUrl}/v1/messages`;
+  const retry = opts.retry;
   const headers: HeadersInit = {
     "content-type": "application/json",
     "x-api-key": opts.apiKey,
@@ -86,14 +90,19 @@ export function createAnthropicClient(opts: AnthropicClientOptions): LLMClient {
     name: `anthropic:${model}`,
 
     async complete(req): Promise<LLMResult> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildAnthropicBody(req, model, maxTokens, false)),
-      });
-      if (!res.ok) {
-        throw new Error(`[autogen-ui] Anthropic ${res.status}: ${await res.text()}`);
-      }
+      // resilientFetch retries transient failures (429/5xx/network) with
+      // backoff + Retry-After, and throws LLMHttpError on terminal failure.
+      const res = await resilientFetch(
+        url,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(buildAnthropicBody(req, model, maxTokens, false)),
+        },
+        "Anthropic",
+        retry,
+        req.signal,
+      );
       const data = (await res.json()) as {
         content?: Array<AnthropicTextBlock | AnthropicToolUseBlock>;
       };
@@ -109,16 +118,26 @@ export function createAnthropicClient(opts: AnthropicClientOptions): LLMClient {
     },
 
     async *stream(req): AsyncIterable<LLMEvent> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildAnthropicBody(req, model, maxTokens, true)),
-      });
-      if (!res.ok || !res.body) {
-        yield {
-          kind: "error",
-          error: `[autogen-ui] Anthropic ${res.status}: ${await res.text().catch(() => "")}`,
-        };
+      let res: Response;
+      try {
+        // Only the initial connection is retried — never a partial stream.
+        res = await resilientFetch(
+          url,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify(buildAnthropicBody(req, model, maxTokens, true)),
+          },
+          "Anthropic",
+          retry,
+          req.signal,
+        );
+      } catch (err) {
+        yield { kind: "error", error: err instanceof Error ? err.message : String(err) };
+        return;
+      }
+      if (!res.body) {
+        yield { kind: "error", error: "[autogen-ui] Anthropic: empty response body" };
         return;
       }
 
@@ -184,6 +203,8 @@ export interface OpenAIClientOptions {
   /** Defaults to "gpt-4o". */
   model?: string;
   baseUrl?: string;
+  /** Retry/backoff/timeout policy. Sensible defaults; see RetryPolicy. */
+  retry?: RetryPolicy;
 }
 
 function buildOpenAIBody(
@@ -221,6 +242,7 @@ export function createOpenAIClient(opts: OpenAIClientOptions): LLMClient {
   const model = opts.model ?? "gpt-4o";
   const baseUrl = opts.baseUrl ?? "https://api.openai.com";
   const url = `${baseUrl}/v1/chat/completions`;
+  const retry = opts.retry;
   const headers: HeadersInit = {
     "content-type": "application/json",
     authorization: `Bearer ${opts.apiKey}`,
@@ -230,14 +252,13 @@ export function createOpenAIClient(opts: OpenAIClientOptions): LLMClient {
     name: `openai:${model}`,
 
     async complete(req): Promise<LLMResult> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildOpenAIBody(req, model, false)),
-      });
-      if (!res.ok) {
-        throw new Error(`[autogen-ui] OpenAI ${res.status}: ${await res.text()}`);
-      }
+      const res = await resilientFetch(
+        url,
+        { method: "POST", headers, body: JSON.stringify(buildOpenAIBody(req, model, false)) },
+        "OpenAI",
+        retry,
+        req.signal,
+      );
       const data = (await res.json()) as {
         choices?: Array<{
           message?: {
@@ -264,16 +285,21 @@ export function createOpenAIClient(opts: OpenAIClientOptions): LLMClient {
     },
 
     async *stream(req): AsyncIterable<LLMEvent> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(buildOpenAIBody(req, model, true)),
-      });
-      if (!res.ok || !res.body) {
-        yield {
-          kind: "error",
-          error: `[autogen-ui] OpenAI ${res.status}: ${await res.text().catch(() => "")}`,
-        };
+      let res: Response;
+      try {
+        res = await resilientFetch(
+          url,
+          { method: "POST", headers, body: JSON.stringify(buildOpenAIBody(req, model, true)) },
+          "OpenAI",
+          retry,
+          req.signal,
+        );
+      } catch (err) {
+        yield { kind: "error", error: err instanceof Error ? err.message : String(err) };
+        return;
+      }
+      if (!res.body) {
+        yield { kind: "error", error: "[autogen-ui] OpenAI: empty response body" };
         return;
       }
 
@@ -417,3 +443,10 @@ async function* readOpenAiSse(body: ReadableStream<Uint8Array>): AsyncIterable<s
 export { createOllamaClient, type OllamaClientOptions } from "./ollama";
 export { createGroqClient, type GroqClientOptions } from "./groq";
 export { wrapAnthropicSdk, wrapOpenAiSdk } from "./sdk-wrappers";
+export {
+  resilientFetch,
+  parseRetryAfter,
+  LLMHttpError,
+  LLMAbortError,
+  type RetryPolicy,
+} from "./http";

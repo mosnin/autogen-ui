@@ -31,6 +31,11 @@ export interface LLMRequest {
   /** Force the model to call this specific tool. */
   toolChoice?: { name: string };
   maxTokens?: number;
+  /**
+   * Optional abort signal. When it fires, the in-flight provider request is
+   * cancelled and the client throws `LLMAbortError` (no further retries).
+   */
+  signal?: AbortSignal;
 }
 
 export interface ToolCall {
