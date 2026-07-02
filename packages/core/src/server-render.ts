@@ -17,6 +17,22 @@ export interface ServerSpec {
   estimatedHeight: number;
 }
 
+/**
+ * Escape a string for safe interpolation into an HTML attribute or text node.
+ * `renderDashboardPlaceholder` emits a raw HTML string intended for
+ * `dangerouslySetInnerHTML`, and node ids originate from LLM-generated (i.e.
+ * untrusted) specs — so every interpolated value MUST be escaped or a crafted
+ * id like `"><img src=x onerror=…>` becomes XSS in the host page.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Walk root + children counting nodes; rough heuristic for SSR height reserve. */
 function estimateHeight(node: UINode | undefined): number {
   if (!node) return 0;
@@ -67,9 +83,12 @@ export function renderDashboardPlaceholder(dashboard: Dashboard): string {
   const blocks = (dashboard.root.children ?? [])
     .map((node) => {
       const h = Math.round(estimateHeight(node));
-      const span = typeof node.style?.span === "number" ? node.style.span : 4;
+      const rawSpan = typeof node.style?.span === "number" ? node.style.span : 4;
+      // Clamp span to the valid 1–12 grid range so a hostile spec cannot emit a
+      // pathological width, and escape the id (untrusted, model-generated).
+      const span = Math.min(12, Math.max(1, Math.round(rawSpan)));
       const widthPct = Math.round((span / 12) * 100);
-      return `<div data-id="${node.id}" style="width:${widthPct}%;height:${h}px;background:hsl(var(--muted));border-radius:var(--radius);opacity:0.5"></div>`;
+      return `<div data-id="${escapeHtml(node.id)}" style="width:${widthPct}%;height:${h}px;background:hsl(var(--muted));border-radius:var(--radius);opacity:0.5"></div>`;
     })
     .join("");
   return `<div style="display:flex;flex-wrap:wrap;gap:1.5rem">${blocks}</div>`;

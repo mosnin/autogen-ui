@@ -545,6 +545,149 @@ function test(name: string, ok: boolean, detail = "") {
   }
 }
 
+// ---------- 9e. Data proxy SSRF hardening (private hosts, schemes, redirects).
+{
+  process.stdout.write("\n# data proxy SSRF hardening\n");
+  const { createDataProxyHandler } = await import("../src/proxy");
+
+  const call = (handler: (r: Request) => Promise<Response>, payload: unknown) =>
+    handler(new Request("http://localhost/proxy", { method: "POST", body: JSON.stringify(payload) }));
+
+  // Default (no allowlist) must still block private/loopback/metadata hosts.
+  const openProxy = createDataProxyHandler();
+  for (const badUrl of [
+    "http://169.254.169.254/latest/meta-data/", // cloud metadata
+    "http://localhost:8080/admin",
+    "http://127.0.0.1/",
+    "http://10.0.0.5/internal",
+    "http://192.168.1.1/",
+    "http://[::1]/",
+  ]) {
+    const res = await call(openProxy, { url: badUrl });
+    test(`blocks private/loopback host by default: ${badUrl}`, res.status === 403);
+  }
+
+  // Non-http(s) schemes are rejected.
+  for (const badScheme of ["file:///etc/passwd", "gopher://x/", "ftp://x/"]) {
+    const res = await call(openProxy, { url: badScheme });
+    test(`blocks non-http scheme: ${badScheme}`, res.status === 403);
+  }
+
+  // Public URL is still allowed through the default proxy (reaches fetch).
+  {
+    const originalFetch = globalThis.fetch;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = (async () =>
+      new Response(JSON.stringify({ ok: 1 }), { headers: { "content-type": "application/json" } })) as typeof fetch;
+    try {
+      const res = await call(openProxy, { url: "https://api.example.com/data" });
+      test("allows public host by default", res.status === 200);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  // A redirect from an allowed public host to a private/metadata host is blocked.
+  {
+    const originalFetch = globalThis.fetch;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = (async (input: RequestInfo | URL): Promise<Response> => {
+      const u = String(input);
+      if (u === "https://api.example.com/redirect") {
+        return new Response(null, {
+          status: 302,
+          headers: { location: "http://169.254.169.254/latest/meta-data/" },
+        });
+      }
+      throw new Error(`unmocked fetch to ${u} — redirect should have been blocked before this`);
+    }) as typeof fetch;
+    try {
+      const res = await call(openProxy, { url: "https://api.example.com/redirect" });
+      const json = (await res.json()) as { error?: string };
+      test("blocks SSRF via redirect to metadata host", res.status === 403 && /redirect/i.test(json.error ?? ""));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  // Client cannot inject arbitrary upstream headers by default.
+  {
+    const originalFetch = globalThis.fetch;
+    let received: Record<string, string> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = (async (_i: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      received = {};
+      const h = init?.headers as Record<string, string> | undefined;
+      if (h) for (const [k, v] of Object.entries(h)) received[k.toLowerCase()] = v;
+      return new Response("{}", { headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      await call(openProxy, {
+        url: "https://api.example.com/x",
+        headers: { "x-forwarded-for": "10.0.0.9", cookie: "session=abc", "x-custom": "nope" },
+      });
+      test("strips dangerous client header (x-forwarded-for)", received["x-forwarded-for"] === undefined);
+      test("strips client cookie header", received["cookie"] === undefined);
+      test("drops non-allowlisted client header by default", received["x-custom"] === undefined);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  // allowPrivateHosts opt-in permits internal targets (reaches fetch).
+  {
+    const originalFetch = globalThis.fetch;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = (async () => new Response("{}", { headers: { "content-type": "application/json" } })) as typeof fetch;
+    try {
+      const internal = createDataProxyHandler({ allowPrivateHosts: true, allow: ["http://10.0.0.5/"] });
+      const res = await call(internal, { url: "http://10.0.0.5/internal" });
+      test("allowPrivateHosts opt-in permits internal host", res.status === 200);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+}
+
+// ---------- 9f. SSR placeholder escapes untrusted node ids (XSS regression).
+{
+  process.stdout.write("\n# SSR placeholder XSS escaping\n");
+  const { renderDashboardPlaceholder } = await import("../src/server-render");
+  const { emptyDashboard } = await import("../src/schema");
+  const d = emptyDashboard("xss");
+  const malicious = {
+    ...d,
+    root: {
+      id: "root",
+      type: "Grid",
+      children: [
+        // An id that would break out of the data-id="" attribute if unescaped.
+        { id: 'x" onmouseover="alert(1)', type: "Stat", props: { label: "L", value: "1" } } as never,
+      ],
+    },
+  };
+  const html = renderDashboardPlaceholder(malicious as never);
+  test("placeholder does not emit a raw attribute-breakout", !html.includes('onmouseover="alert(1)"'));
+  test("placeholder HTML-escapes the double quote in id", html.includes("&quot;"));
+  test("placeholder contains no unescaped < from ids", !/<[^>]*<script/i.test(html));
+}
+
+// ---------- 9g. Node id schema rejects HTML-significant characters.
+{
+  process.stdout.write("\n# node id schema hardening\n");
+  const { nodeIdSchema, uiNodeSchema } = await import("../src/schema");
+  test("nodeIdSchema accepts normal id", nodeIdSchema.safeParse("stat-mrr").success);
+  test("nodeIdSchema accepts ForEach-style id", nodeIdSchema.safeParse("row__0").success);
+  test("nodeIdSchema accepts colon/dot id", nodeIdSchema.safeParse("chart:revenue.v2").success);
+  test("nodeIdSchema rejects quote", !nodeIdSchema.safeParse('x" onx="').success);
+  test("nodeIdSchema rejects angle bracket", !nodeIdSchema.safeParse("<script>").success);
+  test("nodeIdSchema rejects ampersand", !nodeIdSchema.safeParse("a&b").success);
+  test(
+    "uiNodeSchema rejects a node with an injection id",
+    !uiNodeSchema.safeParse({ id: 'x"><img>', type: "Stat" }).success,
+  );
+}
+
 // ---------- 10. Form components are registered and discoverable.
 {
   process.stdout.write("\n# form components in registry\n");

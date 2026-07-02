@@ -217,9 +217,24 @@ export interface UINode {
   when?: string;
 }
 
+/**
+ * Node ids are rendered into the DOM (e.g. as `data-id`/`id` attributes and,
+ * in the SSR placeholder path, into a raw HTML string). Since the spec is
+ * LLM-generated from untrusted input, forbid the HTML-significant characters
+ * that enable attribute-breakout / injection. Normal ids ("stat-mrr",
+ * "row__0", "chart:revenue") are unaffected; the agent's repair loop corrects
+ * the rare deviation. Defense-in-depth alongside output escaping.
+ */
+export const nodeIdSchema = z
+  .string()
+  .min(1)
+  .refine((s) => !/[<>"'`&]/.test(s), {
+    message: "id must not contain HTML-significant characters (< > \" ' ` &)",
+  });
+
 export const uiNodeSchema: z.ZodType<UINode> = z.lazy(() =>
   z.object({
-    id: z.string().min(1),
+    id: nodeIdSchema,
     type: z.string().min(1),
     props: z.record(jsonValueSchema).optional(),
     bindings: z.record(z.string()).optional(),

@@ -1,0 +1,69 @@
+name: CI
+
+# Enterprise gate: every push and PR must pass typecheck, the core test suite,
+# and a clean build before it can be merged. Nothing ships ungated.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (all packages)
+        run: pnpm -r typecheck
+
+      - name: Test (core)
+        run: pnpm --filter @autogen-ui/core test
+
+      - name: Build (core)
+        run: pnpm --filter @autogen-ui/core build
+
+  audit:
+    name: Dependency audit (shipped package)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # Fail only on high/critical advisories in the shipped core package's
+      # production dependency tree. Example-app devDeps are excluded from the gate.
+      - name: Audit @autogen-ui/core production deps
+        run: pnpm --filter @autogen-ui/core audit --prod --audit-level=high
