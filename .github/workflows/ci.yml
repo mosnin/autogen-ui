@@ -40,8 +40,11 @@ jobs:
       - name: Typecheck (all packages)
         run: pnpm -r typecheck
 
-      - name: Test (core)
-        run: pnpm --filter @autogen-ui/core test
+      - name: Unit + component tests with coverage ratchet (core)
+        run: pnpm --filter @autogen-ui/core coverage
+
+      - name: Integration eval suite (core)
+        run: pnpm --filter @autogen-ui/core test:integration
 
       - name: Build (core)
         run: pnpm --filter @autogen-ui/core build

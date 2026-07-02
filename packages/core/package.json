@@ -76,7 +76,11 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx scripts/run-eval.ts",
+    "test": "vitest run && tsx scripts/run-eval.ts",
+    "test:unit": "vitest run",
+    "test:integration": "tsx scripts/run-eval.ts",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
     "smoke:llm": "tsx scripts/real-llm-smoke.ts",
     "probe:llm": "tsx scripts/quality-probe.ts",
     "example:node": "tsx scripts/node-server-example.ts",
@@ -93,14 +97,20 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@vitest/coverage-v8": "^2",
     "framer-motion": "^11.11.17",
+    "jsdom": "^25",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsup": "^8.5.1",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2"
   },
   "publishConfig": {
     "access": "public"

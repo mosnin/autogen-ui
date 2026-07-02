@@ -15,7 +15,14 @@ import { defineConfig } from "tsup";
  *    `.cjs`. Type declarations are emitted via tsup's `dts: true`.
  */
 export default defineConfig({
-  entry: ["src/**/*.ts", "src/**/*.tsx", "!src/**/*.d.ts"],
+  entry: [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "!src/**/*.d.ts",
+    // Test files live next to source but must never ship in the dist bundle.
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+  ],
   format: ["esm", "cjs"],
   dts: true,
   target: "es2021",
